@@ -124,12 +124,12 @@ async function loadData(s) {
 }
 
 // ---------- desenho ----------
-function text(stack, str, { size = 13, weight = 'regular', color = C.text, lines = 1 } = {}) {
+function text(stack, str, { size = 13, weight = 'regular', color = C.text, lines = 1, shrink = 1 } = {}) {
   const font = weight === 'bold' ? Font.boldSystemFont(size)
     : weight === 'semibold' ? Font.semiboldSystemFont(size)
       : weight === 'medium' ? Font.mediumSystemFont(size) : Font.systemFont(size);
   const t = stack.addText(str);
-  t.font = font; t.textColor = color; t.lineLimit = lines;
+  t.font = font; t.textColor = color; t.lineLimit = lines; t.minimumScaleFactor = shrink;
   return t;
 }
 
@@ -235,13 +235,15 @@ function buildRectangular(w, d) {
   w.setPadding(0, 0, 0, 0);
   const e = nextEvent(d);
   const first = d.photoPending ? '📸 Foto do dia por tirar' : e ? `📅 ${eventShort(d, e)}` : '📅 Nada para hoje';
-  text(w, first, { size: 15, weight: 'semibold', color: Color.white() });
-  text(w, `✅ ${d.tasks.length} ${d.tasks.length === 1 ? 'tarefa' : 'tarefas'}  ·  🛒 ${d.shopping}`, { size: 14, color: Color.white() });
+  const line = { size: 14, color: Color.white(), shrink: 0.75 };
+  text(w, first, { ...line, size: 15, weight: 'semibold' });
+  text(w, `✅ ${d.tasks.length}   🛒 ${d.shopping}`, line);
   if (d.next) {
-    const when = d.next.n.days === 0 ? 'hoje!' : d.next.n.days === 1 ? 'amanhã' : `${d.next.n.days} dias`;
-    text(w, `💛 ${d.next.title} · ${when}`, { size: 14, color: Color.white() });
+    // A contagem vem primeiro para nunca ficar cortada.
+    const when = d.next.n.days === 0 ? 'Hoje!' : d.next.n.days === 1 ? 'Amanhã' : `${d.next.n.days}d`;
+    text(w, `💛 ${when} · ${d.next.title}`, line);
   } else if (d.photoPending && e) {
-    text(w, `📅 ${eventShort(d, e)}`, { size: 14, color: Color.white() });
+    text(w, `📅 ${eventShort(d, e)}`, line);
   }
 }
 
