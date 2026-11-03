@@ -221,7 +221,45 @@ function buildMedium(w, d, large) {
   footer(w, d, 13);
 }
 
+// ---------- ecrã bloqueado ----------
+/** Próximo evento de hoje: o que ainda não começou, senão o primeiro do dia. */
+function nextEvent(d) {
+  const now = new Date();
+  const nowHM = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const timed = d.todayEvents.filter((e) => e.start_time && !d.isMultiDayMiddle(e));
+  return timed.find((e) => hhmm(e.start_time) >= nowHM) || d.todayEvents.find((e) => !e.start_time || d.isMultiDayMiddle(e)) || null;
+}
+const eventShort = (d, e) => (e.start_time && !d.isMultiDayMiddle(e) ? `${hhmm(e.start_time)} ${e.title}` : e.title);
+
+function buildRectangular(w, d) {
+  w.setPadding(0, 0, 0, 0);
+  const e = nextEvent(d);
+  const first = d.photoPending ? '📸 Foto do dia por tirar' : e ? `📅 ${eventShort(d, e)}` : '📅 Nada para hoje';
+  text(w, first, { size: 15, weight: 'semibold', color: Color.white() });
+  text(w, `✅ ${d.tasks.length} ${d.tasks.length === 1 ? 'tarefa' : 'tarefas'}  ·  🛒 ${d.shopping}`, { size: 14, color: Color.white() });
+  if (d.next) {
+    const when = d.next.n.days === 0 ? 'hoje!' : d.next.n.days === 1 ? 'amanhã' : `${d.next.n.days} dias`;
+    text(w, `💛 ${d.next.title} · ${when}`, { size: 14, color: Color.white() });
+  } else if (d.photoPending && e) {
+    text(w, `📅 ${eventShort(d, e)}`, { size: 14, color: Color.white() });
+  }
+}
+
+function buildInline(w, d) {
+  const e = nextEvent(d);
+  text(w, d.photoPending ? '📸 Foto do dia por tirar' : e ? `📅 ${eventShort(d, e)}` : `✅ ${d.tasks.length}  🛒 ${d.shopping}`);
+}
+
+function buildCircular(w, d) {
+  w.setPadding(0, 0, 0, 0);
+  w.addSpacer();
+  const top = w.addStack(); top.addSpacer(); text(top, d.photoPending ? '📸' : '✅', { size: 14 }); top.addSpacer();
+  const mid = w.addStack(); mid.addSpacer(); text(mid, String(d.tasks.length), { size: 22, weight: 'bold', color: Color.white() }); mid.addSpacer();
+  w.addSpacer();
+}
+
 function message(w, title, body) {
+  if ((config.widgetFamily || '').startsWith('accessory')) { text(w, `Nós Dois: ${title}`, { size: 13, lines: 3 }); return; }
   text(w, 'Nós Dois', { size: 13, weight: 'bold', color: C.accent });
   w.addSpacer(6);
   text(w, title, { size: 14, weight: 'semibold', lines: 2 });
@@ -243,20 +281,24 @@ async function main() {
     if (i === -1) return;
   }
 
+  const family = config.widgetFamily || 'medium';
+  const lock = family.startsWith('accessory'); // ecrã bloqueado: sem fundo, letras brancas
   const w = new ListWidget();
-  w.backgroundColor = C.bg;
+  if (!lock) w.backgroundColor = C.bg;
   w.setPadding(14, 16, 14, 16);
   w.url = APP_URL;
   w.refreshAfterDate = new Date(Date.now() + 15 * 60000);
 
-  const family = config.widgetFamily || 'medium';
   try {
     const s = await getSession();
     if (!s) {
       message(w, 'Falta iniciar sessão', 'Abre a app Scriptable e toca no script "Nós Dois" para entrar.');
     } else {
       const d = await loadData(s);
-      if (family === 'small') buildSmall(w, d);
+      if (family === 'accessoryRectangular') buildRectangular(w, d);
+      else if (family === 'accessoryInline') buildInline(w, d);
+      else if (family === 'accessoryCircular') buildCircular(w, d);
+      else if (family === 'small') buildSmall(w, d);
       else buildMedium(w, d, family === 'large' || family === 'extraLarge');
     }
   } catch (e) {
