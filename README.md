@@ -21,13 +21,11 @@ Sem Supabase configurado, a app arranca em **modo demonstração** (dados guarda
 4. **Authentication → Users → Add user → Create new user**: criar o teu utilizador e o da Beatriz
    (email + palavra-passe, com *Auto Confirm User* ligado).
    > A base de dados recusa um terceiro utilizador.
-5. **Project Settings → API**: copiar o **Project URL** e a chave **anon public**.
+5. **Project Settings → API Keys**: copiar o **Project URL** e a **Publishable key**.
 
 ### 2. GitHub (alojamento)
 1. Criar um repositório (ex.: `nos-dois`) e enviar este código para lá.
-2. **Settings → Secrets and variables → Actions → New repository secret**:
-   - `VITE_SUPABASE_URL` = Project URL
-   - `VITE_SUPABASE_ANON_KEY` = chave anon public
+2. Pôr o **Project URL** e a chave **publishable** em `.env.production`.
 3. **Settings → Pages → Source: GitHub Actions**.
 4. Cada `git push` para `main` publica automaticamente em
    `https://<o-teu-utilizador>.github.io/nos-dois/`.
