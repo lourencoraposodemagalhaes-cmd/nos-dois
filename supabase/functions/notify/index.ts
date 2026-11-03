@@ -2,7 +2,8 @@
 //
 // Chamada de três formas:
 //  - {type:"tick"}   pelo relógio (pg_cron) de 10 em 10 min → resumo da manhã,
-//                    datas especiais e lembretes 30 min antes dos eventos
+//                    datas especiais, lembretes 30 min antes dos eventos e
+//                    a "hora da foto do dia" (hora aleatória, estilo BeReal)
 //  - {type:"change"} pelos triggers da base de dados → "a Beatriz adicionou…"
 //  - {type:"test"}   pela app (com sessão iniciada) → notificação de teste
 //
@@ -104,6 +105,41 @@ async function send(userIds: string[], note: Note) {
   return sent;
 }
 
+// ---------- foto do dia ----------
+// Janela em que pode calhar a hora da foto (hora de Lisboa).
+const PHOTO_WINDOW = { weekday: [9 * 60, 18 * 60], weekend: [11 * 60, 19 * 60] };
+
+/** Converte "AAAA-MM-DD" + minutos (hora de Lisboa) num instante UTC. */
+function lisbonToUtc(date: string, minutes: number) {
+  const guess = new Date(`${date}T00:00:00Z`).getTime() + minutes * 60000;
+  // Diferença entre Lisboa e UTC nesse momento (0 ou +60 min).
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(new Date(guess));
+  const local = Number(p.find((x) => x.type === 'hour')!.value) * 60 + Number(p.find((x) => x.type === 'minute')!.value);
+  let offset = local - minutes; if (offset < -720) offset += 1440; if (offset > 720) offset -= 1440;
+  return new Date(guess - offset * 60000);
+}
+
+async function photoMoment(today: string, people: Row[]) {
+  let { data: moment } = await db.from('daily_moments').select('*').eq('date', today).maybeSingle();
+  if (!moment) {
+    const dow = parse(today).getUTCDay();
+    const [a, b] = dow === 0 || dow === 6 ? PHOTO_WINDOW.weekend : PHOTO_WINDOW.weekday;
+    const minutes = a + Math.floor(Math.random() * (b - a));
+    await db.from('daily_moments').upsert({ date: today, at: lisbonToUtc(today, minutes).toISOString() },
+      { onConflict: 'date', ignoreDuplicates: true });
+    ({ data: moment } = await db.from('daily_moments').select('*').eq('date', today).maybeSingle());
+  }
+  if (!moment || moment.notified_at || new Date(moment.at) > new Date()) return;
+  // Marca como avisado só se ainda não estava (evita avisos repetidos).
+  const { data: claimed } = await db.from('daily_moments').update({ notified_at: new Date().toISOString() })
+    .eq('date', today).is('notified_at', null).select();
+  if (!claimed?.length) return;
+  await send(people.map((p: Row) => p.id), {
+    title: '📸 Hora da foto do dia!', body: 'Mostra ao outro o que estás a fazer agora mesmo.', url: '#hoje', tag: `photo-${today}`,
+  });
+}
+
 // ---------- relógio ----------
 async function tick() {
   const now = lisbonNow();
@@ -113,6 +149,8 @@ async function tick() {
     db.from('events').select('*').lte('date', addDays(today, 1)).gte('date', addDays(today, -366)),
   ]);
   const people = profiles ?? [];
+
+  await photoMoment(today, people);
 
   // Lembrete 30 min antes (no 1.º dia de cada evento com hora).
   for (const e of events ?? []) {
@@ -191,6 +229,18 @@ async function change(msg: Row) {
       title: `📅 ${actor.name} adicionou ${r.person ? 'um evento para ti' : 'um evento para os dois'}`,
       body: `${r.title} · ${when}`, url: '#calendario', tag: `event-${r.id}`,
     });
+  } else if (msg.table === 'photos') {
+    if (r.kind === 'daily') {
+      const { data: theirs } = await db.from('photos').select('id')
+        .eq('kind', 'daily').eq('date', r.date).eq('created_by', other.id).limit(1);
+      await send([other.id], {
+        title: `📸 ${actor.name} publicou a foto do dia`,
+        body: theirs?.length ? 'Vem ver! 👀' : 'Publica a tua para a conseguires ver 👀',
+        url: '#hoje', tag: `photo-${r.date}`,
+      });
+    } else {
+      await send([other.id], { title: `🎞️ ${actor.name} juntou uma recordação ao álbum`, body: r.caption ?? '', url: '#fotos', tag: `memory-${r.id}` });
+    }
   } else if (msg.table === 'tasks') {
     const due = r.due_date ? ` · até ${friendly(r.due_date, today)}` : '';
     await send([other.id], {

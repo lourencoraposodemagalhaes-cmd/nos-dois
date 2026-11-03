@@ -9,6 +9,7 @@ import { Tarefas } from './views/Tarefas.jsx';
 import { Compras } from './views/Compras.jsx';
 import { Datas } from './views/Datas.jsx';
 import { Jarro } from './views/Jarro.jsx';
+import { Fotos, PhotoMoment } from './views/Foto.jsx';
 import './styles.css';
 
 const TABS = [
@@ -16,11 +17,11 @@ const TABS = [
   { id: 'calendario', label: 'Calendário', icon: 'calendar', View: Calendario },
   { id: 'tarefas', label: 'Tarefas', icon: 'check', View: Tarefas },
   { id: 'compras', label: 'Compras', icon: 'cart', View: Compras },
-  { id: 'datas', label: 'Nós', icon: 'heart', View: Datas, also: ['jarro'] },
+  { id: 'datas', label: 'Nós', icon: 'heart', View: Datas, also: ['jarro', 'fotos'] },
 ];
 
 // Páginas que não têm separador próprio (vivem dentro de outro).
-const PAGES = { ...Object.fromEntries(TABS.map((t) => [t.id, t.View])), jarro: Jarro };
+const PAGES = { ...Object.fromEntries(TABS.map((t) => [t.id, t.View])), jarro: Jarro, fotos: Fotos };
 
 const readTab = () => { const h = location.hash.slice(1); return Object.hasOwn(PAGES, h) ? h : 'hoje'; };
 
@@ -28,10 +29,12 @@ function App() {
   const { session, loaded } = useSession();
   const [tab, setTab] = useState(readTab);
   const [toast, setToast] = useState(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   useEffect(() => {
     const onHash = () => setTab(readTab());
     addEventListener('hashchange', onHash);
+    addEventListener('open-photo', () => setPhotoOpen(true));
     onError((e) => { setToast(e.message || 'Algo correu mal'); setTimeout(() => setToast(null), 4000); });
     return () => removeEventListener('hashchange', onHash);
   }, []);
@@ -53,6 +56,7 @@ function App() {
           </a>
         ))}
       </nav>
+      <PhotoMoment forceOpen={photoOpen} onClose={() => setPhotoOpen(false)} />
       {toast && <div class="toast" role="alert">{toast}</div>}
     </>
   );

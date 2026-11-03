@@ -4,13 +4,13 @@
 import { useEffect, useState } from 'preact/hooks';
 import { createClient } from '@supabase/supabase-js';
 
-const URL = import.meta.env.VITE_SUPABASE_URL;
+const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const DEMO = !URL || !KEY;
-export const TABLES = ['profiles', 'events', 'tasks', 'shopping_items', 'special_dates', 'jar_items'];
+export const DEMO = !SB_URL || !KEY;
+export const TABLES = ['profiles', 'events', 'tasks', 'shopping_items', 'special_dates', 'jar_items', 'photos', 'daily_moments'];
 
-const supabase = DEMO ? null : createClient(URL, KEY, {
+const supabase = DEMO ? null : createClient(SB_URL, KEY, {
   auth: { persistSession: true, autoRefreshToken: true },
 });
 
@@ -107,6 +107,29 @@ const report = (e) => { console.error(e); errorHandler(e); };
 export async function signIn(email, password) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
+}
+
+// ---------- ficheiros (fotos) ----------
+const demoFiles = new Map(); // modo demo: as fotos ficam só em memória
+
+export async function uploadFile(path, blob) {
+  if (DEMO) { demoFiles.set(path, URL.createObjectURL(blob)); return; }
+  const { error } = await supabase.storage.from('photos').upload(path, blob, { contentType: blob.type, upsert: false });
+  if (error) throw error;
+}
+
+export async function deleteFile(path) {
+  if (DEMO) { demoFiles.delete(path); return; }
+  await supabase.storage.from('photos').remove([path]);
+}
+
+/** Endereços temporários (1 h) para mostrar fotos privadas. */
+export async function signedUrls(paths) {
+  if (!paths.length) return {};
+  if (DEMO) return Object.fromEntries(paths.map((p) => [p, demoFiles.get(p) ?? null]));
+  const { data, error } = await supabase.storage.from('photos').createSignedUrls(paths, 3600);
+  if (error) throw error;
+  return Object.fromEntries(data.map((d) => [d.path, d.signedUrl]));
 }
 
 // ---------- notificações ----------
@@ -224,6 +247,8 @@ function demoSeed() {
       r({ title: 'O nosso aniversário', date: '2019-' + d(12).slice(5), kind: 'anniversary', yearly: true }),
       r({ title: 'Aniversário da Beatriz', date: '1995-' + d(40).slice(5), kind: 'birthday', yearly: true }),
     ],
+    daily_moments: [{ id: 'moment', date: d(0), at: new Date(Date.now() - 36e5).toISOString() }],
+    photos: [],
     jar_items: [
       r({ text: 'Piquenique no parque', status: 'jar', created_by: a }),
       r({ text: 'Noite de jogos de tabuleiro', status: 'jar', created_by: a }),

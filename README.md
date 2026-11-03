@@ -76,5 +76,14 @@ lembretes 30 min antes dos eventos e avisos quando o outro adiciona um evento ou
 5. A chave pública VAPID vai em `.env.production` (`VITE_VAPID_PUBLIC_KEY`).
 6. Na app: ⚙️ → **Ativar notificações** → **Enviar notificação de teste**.
 
+## Foto do dia e recordações
+
+Uma vez por dia, a uma hora aleatória (dias úteis 9h–18h, fim de semana 11h–19h, hora de Lisboa),
+os dois recebem "📸 Hora da foto do dia!". Só se vê a foto do outro depois de publicar a sua.
+Uma vez por dia aparece também uma recordação ao acaso (fotos com mais de 7 dias).
+
+1. **SQL Editor**: correr [`supabase/photos.sql`](supabase/photos.sql) (tabelas, Storage privado, triggers).
+2. **Edge Functions → notify → Code**: colar a versão atual de `supabase/functions/notify/index.ts` → Deploy.
+
 ## Ideias para depois
 - Despesas partilhadas, plano de refeições, notas.

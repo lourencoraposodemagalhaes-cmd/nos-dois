@@ -9,6 +9,7 @@ export function NosSwitch({ current }) {
     <div class="segmented wide">
       <a href="#datas" class={current === 'datas' ? 'on' : ''}><Icon name="heart" size={16} /> Datas</a>
       <a href="#jarro" class={current === 'jarro' ? 'on' : ''}><Icon name="jar" size={16} /> Jarro</a>
+      <a href="#fotos" class={current === 'fotos' ? 'on' : ''}><Icon name="camera" size={16} /> Fotos</a>
     </div>
   );
 }

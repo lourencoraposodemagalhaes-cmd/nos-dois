@@ -6,6 +6,7 @@ import { Icon, PageHeader, Sheet, Field, usePeople } from '../ui.jsx';
 import { EventRow, EventSheet, sortEvents, specialsOn } from './Calendario.jsx';
 import { TaskRow, sortTasks } from './Tarefas.jsx';
 import { upcomingSpecials, countdown, KINDS } from './Datas.jsx';
+import { usePhotoPending } from './Foto.jsx';
 
 function greeting() {
   const h = new Date().getHours();
@@ -21,6 +22,7 @@ export function Hoje({ go }) {
   const people = usePeople();
   const [settings, setSettings] = useState(false);
   const [editing, setEditing] = useState(null);
+  const photoPending = usePhotoPending();
 
   const t = today();
   const todayEvents = events.filter((e) => eventCovers(e, t)).sort(sortEvents);
@@ -34,7 +36,14 @@ export function Hoje({ go }) {
   return (
     <section>
       <PageHeader title={`${greeting()}${people.me ? `, ${people.me.name}` : ''}`} subtitle={longDate(t)}
-        right={<button class="icon-btn" onClick={() => setSettings(true)} aria-label="Definições"><Icon name="gear" /></button>} />
+        right={
+          <div class="row">
+            <button class="icon-btn has-dot" onClick={() => dispatchEvent(new Event('open-photo'))} aria-label="Foto do dia">
+              <Icon name="camera" />{photoPending && <span class="red-dot" />}
+            </button>
+            <button class="icon-btn" onClick={() => setSettings(true)} aria-label="Definições"><Icon name="gear" /></button>
+          </div>
+        } />
 
       <PushBanner />
 
