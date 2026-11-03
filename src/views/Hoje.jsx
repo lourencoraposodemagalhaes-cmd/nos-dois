@@ -1,5 +1,6 @@
-import { useState } from 'preact/hooks';
-import { useTable, update, signOut, myId, DEMO } from '../lib/store.js';
+import { useState, useEffect } from 'preact/hooks';
+import { useTable, update, signOut, myId, DEMO, sendTestPush } from '../lib/store.js';
+import { pushStatus, enablePush, disablePush } from '../lib/push.js';
 import { today, addDays, longDate, friendly, eventCovers } from '../lib/dates.js';
 import { Icon, PageHeader, Sheet, Field, usePeople } from '../ui.jsx';
 import { EventRow, EventSheet, sortEvents, specialsOn } from './Calendario.jsx';
@@ -33,6 +34,8 @@ export function Hoje({ go }) {
     <section>
       <PageHeader title={`${greeting()}${people.me ? `, ${people.me.name}` : ''}`} subtitle={longDate(t)}
         right={<button class="icon-btn" onClick={() => setSettings(true)} aria-label="Definições"><Icon name="gear" /></button>} />
+
+      <PushBanner />
 
       {todaySpecials.map((s) => (
         <div class="card celebrate"><Icon name={KINDS[s.kind]?.icon ?? 'heart'} size={22} /> Hoje é: <strong>{s.title}</strong></div>
@@ -105,9 +108,75 @@ function Settings({ onClose }) {
           </div>
         </Field>
         <button class="btn primary" type="submit">Guardar</button>
+        <Field label="Notificações"><PushControls /></Field>
         {!DEMO && <button class="btn ghost" type="button" onClick={() => { signOut(); onClose(); }}>Terminar sessão</button>}
         {DEMO && <p class="hint">Modo demonstração: os dados ficam só neste dispositivo. Liga o Supabase para sincronizar entre os dois.</p>}
       </form>
     </Sheet>
+  );
+}
+
+// ---------- notificações ----------
+function usePushStatus() {
+  const [status, setStatus] = useState(null);
+  const refresh = () => pushStatus().then(setStatus).catch(() => setStatus('unsupported'));
+  useEffect(() => { refresh(); }, []);
+  return [status, refresh];
+}
+
+/** Cartão no ecrã "Hoje" enquanto as notificações não estiverem ativas neste iPhone. */
+function PushBanner() {
+  const [status, refresh] = usePushStatus();
+  const [busy, setBusy] = useState(false);
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem('push-banner-hidden') === '1'; } catch { return false; } });
+  if (status !== 'off' || hidden) return null;
+  const hide = () => { setHidden(true); try { localStorage.setItem('push-banner-hidden', '1'); } catch { /* ignora */ } };
+  const on = async () => {
+    setBusy(true);
+    try { await enablePush(); } catch (e) { alert(e.message); }
+    setBusy(false); refresh();
+  };
+  return (
+    <div class="card push-banner">
+      <span class="tile-ico t-heart"><Icon name="bell" /></span>
+      <div class="grow">
+        <strong>Ativar notificações</strong>
+        <small>Resumo às 8h, datas especiais e lembretes.</small>
+      </div>
+      <button class="pill accent" onClick={on} disabled={busy}>{busy ? '…' : 'Ativar'}</button>
+      <button class="icon-btn" onClick={hide} aria-label="Agora não"><Icon name="x" size={18} /></button>
+    </div>
+  );
+}
+
+function PushControls() {
+  const [status, refresh] = usePushStatus();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const run = async (fn) => {
+    setBusy(true); setMsg('');
+    try { await fn(); } catch (e) { setMsg(e.message || 'Algo correu mal'); }
+    setBusy(false); refresh();
+  };
+  if (status === null) return <p class="hint">A verificar…</p>;
+  if (status === 'install') return <p class="hint">No iPhone, as notificações só funcionam com a app adicionada ao ecrã principal (Safari → Partilhar → Adicionar ao ecrã principal).</p>;
+  if (status === 'unsupported') return <p class="hint">Este dispositivo não suporta notificações.</p>;
+  if (status === 'denied') return <p class="hint">As notificações estão bloqueadas. Ativa-as em Definições do iPhone → Notificações → Nós Dois.</p>;
+  return (
+    <div class="form">
+      {status === 'on' ? (
+        <>
+          <p class="hint">✅ Ativas neste dispositivo: resumo às 8h, datas especiais, lembretes 30 min antes dos eventos e avisos quando o outro adiciona algo.</p>
+          <button type="button" class="btn ghost" disabled={busy} onClick={() => run(async () => {
+            const r = await sendTestPush();
+            setMsg(r?.sent ? 'Enviada! Deve chegar dentro de segundos.' : 'Não foi enviada nenhuma notificação.');
+          })}>Enviar notificação de teste</button>
+          <button type="button" class="link-btn danger" disabled={busy} onClick={() => run(disablePush)}>Desativar neste dispositivo</button>
+        </>
+      ) : (
+        <button type="button" class="btn ghost" disabled={busy} onClick={() => run(enablePush)}>🔔 Ativar notificações</button>
+      )}
+      {msg && <p class="hint">{msg}</p>}
+    </div>
   );
 }

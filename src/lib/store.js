@@ -109,6 +109,23 @@ export async function signIn(email, password) {
   if (error) throw error;
 }
 
+// ---------- notificações ----------
+export async function savePushSubscription({ endpoint, p256dh, auth }) {
+  const { error } = await supabase.from('push_subscriptions')
+    .upsert({ user_id: myId(), endpoint, p256dh, auth }, { onConflict: 'endpoint' });
+  if (error) throw error;
+}
+
+export async function deletePushSubscription(endpoint) {
+  await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+}
+
+export async function sendTestPush() {
+  const { data, error } = await supabase.functions.invoke('notify', { body: { type: 'test' } });
+  if (error) throw error;
+  return data;
+}
+
 export async function signOut() {
   if (DEMO) return;
   await supabase.auth.signOut();

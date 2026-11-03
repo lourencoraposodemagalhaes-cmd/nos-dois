@@ -60,6 +60,21 @@ src/
 supabase/schema.sql   tabelas, segurança (RLS) e tempo real
 ```
 
+## Notificações
+
+Resumo às 8:00 (hora de Lisboa), datas especiais (7 dias antes, véspera e no dia),
+lembretes 30 min antes dos eventos e avisos quando o outro adiciona um evento ou tarefa.
+
+1. **SQL Editor**: correr [`supabase/notifications.sql`](supabase/notifications.sql).
+2. **SQL Editor**: guardar o segredo partilhado no Vault:
+   `select vault.create_secret('<segredo>', 'notify_secret');`
+3. **Edge Functions → Deploy a new function → Via Editor**: nome `notify`, colar
+   [`supabase/functions/notify/index.ts`](supabase/functions/notify/index.ts) → Deploy.
+   Nos detalhes da função, desligar **Verify JWT** (o relógio chama-a sem sessão).
+4. **Edge Functions → Secrets**: `VAPID_KEYS` (JSON com as chaves VAPID em JWK) e
+   `NOTIFY_SECRET` (o mesmo segredo do passo 2).
+5. A chave pública VAPID vai em `.env.production` (`VITE_VAPID_PUBLIC_KEY`).
+6. Na app: ⚙️ → **Ativar notificações** → **Enviar notificação de teste**.
+
 ## Ideias para depois
-- Notificações push (lembrete de tarefas e de datas especiais) com uma Edge Function do Supabase.
 - Despesas partilhadas, plano de refeições, notas.

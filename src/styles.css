@@ -240,3 +240,8 @@ small { color: var(--muted); font-size: 13px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar) + 16px); z-index: 60; max-width: 480px; margin: 0 auto; background: var(--text); color: var(--bg); padding: 12px 16px; border-radius: 14px; font-size: 14px; animation: up 0.2s; }
+
+/* ---------- notificações ---------- */
+.push-banner { display: flex; align-items: center; gap: 12px; padding: 12px 8px 12px 14px; margin-bottom: 10px; }
+.push-banner strong { font-weight: 650; }
+.pill.accent { background: var(--accent); color: #fff; }
