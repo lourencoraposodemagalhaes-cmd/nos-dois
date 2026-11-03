@@ -87,3 +87,23 @@ export function nextDue(task) {
   do { next = step(next); } while (next <= today());
   return next;
 }
+
+// ---------- eventos de vários dias ----------
+export const eventEnd = (e) => (e.end_date && e.end_date > e.date ? e.end_date : e.date);
+export const isMultiDay = (e) => eventEnd(e) !== e.date;
+export const eventCovers = (e, iso) => e.date <= iso && iso <= eventEnd(e);
+
+/** Todos os dias que um evento ocupa (limitado a um ano, por segurança). */
+export function eventDays(e) {
+  const days = [];
+  for (let d = e.date, i = 0; d <= eventEnd(e) && i < 366; d = addDays(d, 1), i++) days.push(d);
+  return days;
+}
+
+/** "3–7 nov" ou "28 nov – 2 dez". */
+export function rangeLabel(e) {
+  const a = parse(e.date), b = parse(eventEnd(e));
+  const m = (d) => MONTHS[d.getMonth()].slice(0, 3);
+  if (a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()) return `${a.getDate()}–${b.getDate()} ${m(b)}`;
+  return `${a.getDate()} ${m(a)} – ${b.getDate()} ${m(b)}`;
+}

@@ -188,6 +188,7 @@ function demoSeed() {
       r({ title: 'Jantar com os pais', date: d(0), start_time: '20:00', person: null }),
       r({ title: 'Dentista', date: d(2), start_time: '09:30', person: b }),
       r({ title: 'Futebol', date: d(3), start_time: '19:00', end_time: '20:30', person: a }),
+      r({ title: 'Fim de semana no Gerês', date: d(9), end_date: d(11), start_time: '18:00', end_time: '20:00', person: null }),
     ],
     tasks: [
       r({ title: 'Pôr o lixo na rua', person: a, due_date: d(0), recurrence: 'weekly', done: false }),

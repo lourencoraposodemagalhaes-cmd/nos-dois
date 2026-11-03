@@ -1,9 +1,10 @@
 import { useState } from 'preact/hooks';
 import { useTable, insert, update, remove } from '../lib/store.js';
-import { today, monthGrid, monthName, WEEK_SHORT, longDate, time, parse, nextOccurrence } from '../lib/dates.js';
+import { today, monthGrid, monthName, WEEK_SHORT, longDate, time, parse, nextOccurrence, eventDays, eventEnd, isMultiDay, rangeLabel } from '../lib/dates.js';
 import { Icon, PageHeader, PersonDot, PersonPicker, Sheet, Field, Fab, Empty, usePeople, personLabel } from '../ui.jsx';
 
-export const sortEvents = (a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '');
+// Eventos de vários dias primeiro, depois por hora.
+export const sortEvents = (a, b) => (isMultiDay(b) - isMultiDay(a)) || (a.start_time ?? '').localeCompare(b.start_time ?? '');
 
 /** Datas especiais que caem num certo dia (para mostrar no calendário). */
 export function specialsOn(specials, iso) {
@@ -21,7 +22,7 @@ export function Calendario() {
   const goToday = () => { const d = parse(today()); setView({ y: d.getFullYear(), m: d.getMonth() }); setSelected(today()); };
 
   const byDay = {};
-  for (const e of events) (byDay[e.date] ??= []).push(e);
+  for (const e of events) for (const d of eventDays(e)) (byDay[d] ??= []).push(e);
 
   const dayEvents = (byDay[selected] ?? []).slice().sort(sortEvents);
   const daySpecials = specialsOn(specials, selected);
@@ -72,7 +73,7 @@ export function Calendario() {
         <Empty icon="calendar" title="Dia livre" text="Toca no + para adicionar um evento." />
       )}
       <div class="list">
-        {dayEvents.map((e) => <EventRow event={e} onClick={() => setEditing(e)} />)}
+        {dayEvents.map((e) => <EventRow event={e} day={selected} onClick={() => setEditing(e)} />)}
       </div>
 
       <Fab label="Novo evento" onClick={() => setEditing({ date: selected })} />
@@ -81,17 +82,28 @@ export function Calendario() {
   );
 }
 
-export function EventRow({ event, onClick, showDate }) {
+export function EventRow({ event, onClick, showDate, day }) {
   const people = usePeople();
+  const multi = isMultiDay(event);
+  // Num evento de vários dias: hora de início no 1.º dia, hora de fim no último, "dia todo" no meio.
+  let timeCol;
+  if (multi && day && day !== event.date) {
+    timeCol = day === eventEnd(event) && event.end_time
+      ? <><small>até</small><b>{time(event.end_time)}</b></>
+      : <small>dia todo</small>;
+  } else if (event.start_time) {
+    timeCol = <><b>{time(event.start_time)}</b>{event.end_time && !multi && <small>{time(event.end_time)}</small>}</>;
+  } else {
+    timeCol = <small>dia todo</small>;
+  }
+  const when = multi ? rangeLabel(event) : showDate;
   return (
     <button class="card item" onClick={onClick}>
-      <div class="time-col">
-        {event.start_time ? <><b>{time(event.start_time)}</b>{event.end_time && <small>{time(event.end_time)}</small>}</> : <small>dia todo</small>}
-      </div>
+      <div class="time-col">{timeCol}</div>
       <span class="bar" style={{ background: people.byId(event.person)?.color ?? 'var(--both)' }} />
       <div class="grow">
         <strong>{event.title}</strong>
-        <small>{showDate ? `${showDate} · ` : ''}{personLabel(event.person, people)}{event.notes ? ` · ${event.notes}` : ''}</small>
+        <small>{when ? `${when} · ` : ''}{personLabel(event.person, people)}{event.notes ? ` · ${event.notes}` : ''}</small>
       </div>
     </button>
   );
@@ -102,17 +114,29 @@ export function EventSheet({ event, onClose }) {
   const [f, setF] = useState({
     title: '', date: today(), start_time: '', end_time: '', person: null, notes: '', ...event,
   });
+  const [multi, setMulti] = useState(isMultiDay({ date: f.date, end_date: f.end_date }));
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const save = (e) => {
     e.preventDefault();
     if (!f.title.trim()) return;
+    const endDate = multi && f.end_date && f.end_date > f.date ? f.end_date : null;
     const row = {
       title: f.title.trim(), date: f.date, person: f.person,
-      start_time: f.start_time || null, end_time: (f.start_time && f.end_time) || null, notes: f.notes?.trim() || null,
+      start_time: f.start_time || null, end_time: (f.end_time && (f.start_time || endDate)) || null, notes: f.notes?.trim() || null,
     };
+    // Só envia end_date quando é preciso (compatível com bases de dados antigas).
+    if (endDate || event.end_date) row.end_date = endDate;
     isNew ? insert('events', row) : update('events', event.id, row);
     onClose();
+  };
+
+  const toggleMulti = (on) => {
+    setMulti(on);
+    if (on && !(f.end_date > f.date)) {
+      const d = parse(f.date); d.setDate(d.getDate() + 1);
+      setF({ ...f, end_date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` });
+    }
   };
 
   return (
@@ -121,11 +145,30 @@ export function EventSheet({ event, onClose }) {
       <form onSubmit={save} class="form">
         <input class="big-input" placeholder="O que é?" value={f.title} onInput={set('title')} autofocus={isNew} />
         <Field label="Quem"><PersonPicker value={f.person} onChange={(person) => setF({ ...f, person })} /></Field>
-        <Field label="Dia"><input type="date" required value={f.date} onInput={set('date')} /></Field>
-        <div class="row gap">
-          <Field label="Início"><input type="time" value={f.start_time ?? ''} onInput={set('start_time')} /></Field>
-          <Field label="Fim"><input type="time" value={f.end_time ?? ''} onInput={set('end_time')} disabled={!f.start_time} /></Field>
-        </div>
+        <label class="switch-row">
+          <span>Vários dias</span>
+          <input type="checkbox" class="switch" checked={multi} onChange={(e) => toggleMulti(e.target.checked)} />
+        </label>
+        {multi ? (
+          <>
+            <div class="row gap">
+              <Field label="De"><input type="date" required value={f.date} onInput={set('date')} /></Field>
+              <Field label="Até"><input type="date" required min={f.date} value={f.end_date ?? ''} onInput={set('end_date')} /></Field>
+            </div>
+            <div class="row gap">
+              <Field label="Hora de início"><input type="time" value={f.start_time ?? ''} onInput={set('start_time')} /></Field>
+              <Field label="Hora de fim"><input type="time" value={f.end_time ?? ''} onInput={set('end_time')} /></Field>
+            </div>
+          </>
+        ) : (
+          <>
+            <Field label="Dia"><input type="date" required value={f.date} onInput={set('date')} /></Field>
+            <div class="row gap">
+              <Field label="Início"><input type="time" value={f.start_time ?? ''} onInput={set('start_time')} /></Field>
+              <Field label="Fim"><input type="time" value={f.end_time ?? ''} onInput={set('end_time')} disabled={!f.start_time} /></Field>
+            </div>
+          </>
+        )}
         <Field label="Notas"><textarea rows="2" value={f.notes ?? ''} onInput={set('notes')} placeholder="Opcional" /></Field>
         <button class="btn primary" type="submit">{isNew ? 'Adicionar' : 'Guardar'}</button>
       </form>

@@ -142,3 +142,6 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ---------- Atualização: eventos de vários dias ----------
+alter table public.events add column if not exists end_date date;

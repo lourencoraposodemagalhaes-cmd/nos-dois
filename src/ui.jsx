@@ -43,7 +43,7 @@ export function usePeople() {
 export function PersonDot({ person, size = 10 }) {
   const { profiles, byId } = usePeople();
   const p = person ? byId(person) : null;
-  const style = { width: size, height: size };
+  const style = { width: `${size}px`, height: `${size}px` }; // Preact 11 não acrescenta 'px' sozinho
   if (p) return <span class="dot" style={{ ...style, background: p.color }} title={p.name} />;
   const [a, b] = profiles;
   return (
@@ -94,7 +94,7 @@ export function Sheet({ title, onClose, children, onDelete }) {
           {onDelete
             ? <button type="button" class="icon-btn danger" aria-label="Apagar"
                 onClick={() => { if (confirm('Apagar?')) { onDelete(); onClose(); } }}><Icon name="trash" /></button>
-            : <span style={{ width: 40 }} />}
+            : <span style={{ width: '40px' }} />}
         </div>
         <div class="sheet-body">{children}</div>
       </div>

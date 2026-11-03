@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { useTable, update, signOut, myId, DEMO } from '../lib/store.js';
-import { today, addDays, longDate, friendly } from '../lib/dates.js';
+import { today, addDays, longDate, friendly, eventCovers } from '../lib/dates.js';
 import { Icon, PageHeader, Sheet, Field, usePeople } from '../ui.jsx';
 import { EventRow, EventSheet, sortEvents, specialsOn } from './Calendario.jsx';
 import { TaskRow, sortTasks } from './Tarefas.jsx';
@@ -21,7 +21,7 @@ export function Hoje({ go }) {
   const [editing, setEditing] = useState(null);
 
   const t = today();
-  const todayEvents = events.filter((e) => e.date === t).sort(sortEvents);
+  const todayEvents = events.filter((e) => eventCovers(e, t)).sort(sortEvents);
   const soon = events.filter((e) => e.date > t && e.date <= addDays(t, 7))
     .sort((a, b) => a.date.localeCompare(b.date) || sortEvents(a, b)).slice(0, 4);
   const dueTasks = tasks.filter((x) => !x.done && x.due_date && x.due_date <= t).sort(sortTasks);
@@ -59,7 +59,7 @@ export function Hoje({ go }) {
       <h3 class="section-title">Hoje</h3>
       {todayEvents.length === 0
         ? <p class="muted pad">Nada no calendário para hoje.</p>
-        : <div class="list">{todayEvents.map((e) => <EventRow event={e} onClick={() => setEditing(e)} />)}</div>}
+        : <div class="list">{todayEvents.map((e) => <EventRow event={e} day={t} onClick={() => setEditing(e)} />)}</div>}
 
       {dueTasks.length > 0 && (
         <>
