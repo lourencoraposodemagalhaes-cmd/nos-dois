@@ -85,5 +85,11 @@ Uma vez por dia aparece também uma recordação ao acaso (fotos com mais de 7 d
 1. **SQL Editor**: correr [`supabase/photos.sql`](supabase/photos.sql) (tabelas, Storage privado, triggers).
 2. **Edge Functions → notify → Code**: colar a versão atual de `supabase/functions/notify/index.ts` → Deploy.
 
+## Widget (resumo do dia)
+
+Com a app gratuita **Scriptable**: copiar [`widget/nos-dois-widget.js`](widget/nos-dois-widget.js) para um
+script novo, correr uma vez para iniciar sessão e adicionar um widget Scriptable ao ecrã principal.
+Mostra eventos de hoje, tarefas, compras, próxima data especial e se a foto do dia está por tirar.
+
 ## Ideias para depois
 - Despesas partilhadas, plano de refeições, notas.
