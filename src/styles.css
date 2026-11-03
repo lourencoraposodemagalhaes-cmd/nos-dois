@@ -333,3 +333,8 @@ small { color: var(--muted); font-size: 13px; }
 .thumb { position: relative; aspect-ratio: 1; background: var(--soft); overflow: hidden; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb span { position: absolute; left: 6px; bottom: 5px; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgb(0 0 0 / 0.6); }
+
+/* ---------- bebés / filhos ---------- */
+.segmented.wrap { flex-wrap: wrap; }
+.segmented.wrap button { flex: 1 1 40%; }
+.kid-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border-radius: 14px; }

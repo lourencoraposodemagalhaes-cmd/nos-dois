@@ -222,11 +222,15 @@ async function change(msg: Row) {
   if (r.person && r.person !== other.id) return; // é só de quem o criou
 
   const today = lisbonNow().date;
+  // Bebé / filho (tabela opcional "kids").
+  let kid: Row | null = null;
+  if (r.kid_id) ({ data: kid } = await db.from('kids').select('*').eq('id', r.kid_id).maybeSingle());
+  const kidLabel = kid ? `${kid.emoji ?? ''} ${kid.name}`.trim() : null;
   if (msg.table === 'events') {
     const when = friendly(r.date, today) + (r.end_date && r.end_date > r.date ? ` até ${friendly(r.end_date, today)}` : '')
       + (r.start_time ? `, ${hhmm(r.start_time)}` : '');
     await send([other.id], {
-      title: `📅 ${actor.name} adicionou ${r.person ? 'um evento para ti' : 'um evento para os dois'}`,
+      title: `📅 ${actor.name} adicionou ${kidLabel ? `um evento: ${kidLabel}` : r.person ? 'um evento para ti' : 'um evento para os dois'}`,
       body: `${r.title} · ${when}`, url: '#calendario', tag: `event-${r.id}`,
     });
   } else if (msg.table === 'photos') {
@@ -244,7 +248,8 @@ async function change(msg: Row) {
   } else if (msg.table === 'tasks') {
     const due = r.due_date ? ` · até ${friendly(r.due_date, today)}` : '';
     await send([other.id], {
-      title: r.person ? `✅ ${actor.name} atribuiu-te uma tarefa` : `✅ ${actor.name} adicionou uma tarefa para os dois`,
+      title: kidLabel ? `✅ ${actor.name} adicionou uma tarefa: ${kidLabel}`
+        : r.person ? `✅ ${actor.name} atribuiu-te uma tarefa` : `✅ ${actor.name} adicionou uma tarefa para os dois`,
       body: `${r.title}${due}`, url: '#tarefas', tag: `task-${r.id}`,
     });
   }

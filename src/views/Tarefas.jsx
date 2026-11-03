@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { useTable, insert, update, remove, myId } from '../lib/store.js';
 import { today, friendly, nextDue } from '../lib/dates.js';
-import { Icon, PageHeader, PersonPicker, Sheet, Field, Fab, Empty, usePeople, personLabel } from '../ui.jsx';
+import { Icon, PageHeader, PersonPicker, Sheet, Field, Fab, Empty, usePeople, personLabel, itemColor } from '../ui.jsx';
 
 const RECUR = { none: 'Não repete', daily: 'Todos os dias', weekly: 'Todas as semanas', monthly: 'Todos os meses' };
 
@@ -25,7 +25,12 @@ export function Tarefas() {
   const [editing, setEditing] = useState(null);
   const [showDone, setShowDone] = useState(false);
 
-  const match = (t) => filter === 'all' || (filter === 'me' ? t.person === myId() || !t.person : t.person === people.partner?.id || !t.person);
+  const match = (t) => {
+    if (filter === 'all') return true;
+    if (filter.startsWith('kid:')) return t.kid_id === filter.slice(4);
+    const who = filter === 'me' ? myId() : people.partner?.id;
+    return t.person === who || (!t.person && !t.kid_id);
+  };
   const open = tasks.filter((t) => !t.done && match(t)).sort(sortTasks);
   const done = tasks.filter((t) => t.done && match(t)).sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? ''));
 
@@ -33,7 +38,8 @@ export function Tarefas() {
     <section>
       <PageHeader title="Tarefas" subtitle={`${open.length} por fazer`} />
       <div class="segmented wide">
-        {[['all', 'Todas'], ['me', 'Minhas'], ['partner', people.partner ? `${people.partner.name}` : 'Parceiro(a)']].map(([k, l]) => (
+        {[['all', 'Todas'], ['me', 'Minhas'], ['partner', people.partner ? `${people.partner.name}` : 'Parceiro(a)'],
+          ...people.kids.map((k) => [`kid:${k.id}`, `${k.emoji ?? ''} ${k.name}`.trim()])].map(([k, l]) => (
           <button class={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{l}</button>
         ))}
       </div>
@@ -66,7 +72,7 @@ export function Tarefas() {
 export function TaskRow({ task, onOpen }) {
   const people = usePeople();
   const late = !task.done && task.due_date && task.due_date < today();
-  const color = people.byId(task.person)?.color ?? 'var(--both)';
+  const color = itemColor(task, people);
   return (
     <div class={`card item task ${task.done ? 'done' : ''}`}>
       <button class="checkbox" style={{ '--c': color }} aria-label={task.done ? 'Marcar por fazer' : 'Marcar feita'}
@@ -76,7 +82,7 @@ export function TaskRow({ task, onOpen }) {
       <button class="grow text-btn" onClick={onOpen}>
         <strong>{task.title}</strong>
         <small>
-          {personLabel(task.person, people)}
+          {personLabel(task.person, people, task.kid_id)}
           {task.due_date && <> · <span class={late ? 'late' : ''}>{friendly(task.due_date)}</span></>}
           {task.recurrence !== 'none' && <> · <span class="inline-ico"><Icon name="repeat" size={12} /></span></>}
         </small>
@@ -97,6 +103,7 @@ function TaskSheet({ task, onClose }) {
       title: f.title.trim(), person: f.person, recurrence: f.recurrence,
       due_date: f.due_date || (f.recurrence !== 'none' ? today() : null),
     };
+    if (f.kid_id || task.kid_id) row.kid_id = f.kid_id ?? null;
     isNew ? insert('tasks', { ...row, done: false }) : update('tasks', task.id, row);
     onClose();
   };
@@ -106,7 +113,7 @@ function TaskSheet({ task, onClose }) {
       onDelete={!isNew && (() => remove('tasks', task.id))}>
       <form onSubmit={save} class="form">
         <input class="big-input" placeholder="O que há para fazer?" value={f.title} onInput={set('title')} autofocus={isNew} />
-        <Field label="Quem"><PersonPicker value={f.person} onChange={(person) => setF({ ...f, person })} /></Field>
+        <Field label="Quem"><PersonPicker value={f.person} kid={f.kid_id} onChange={(person, kid_id) => setF({ ...f, person, kid_id })} /></Field>
         <Field label="Até quando"><input type="date" value={f.due_date ?? ''} onInput={set('due_date')} /></Field>
         <Field label="Repetir">
           <select value={f.recurrence} onChange={set('recurrence')}>

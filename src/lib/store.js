@@ -8,7 +8,7 @@ const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const DEMO = !SB_URL || !KEY;
-export const TABLES = ['profiles', 'events', 'tasks', 'shopping_items', 'special_dates', 'jar_items', 'photos', 'daily_moments'];
+export const TABLES = ['profiles', 'events', 'tasks', 'shopping_items', 'special_dates', 'jar_items', 'photos', 'daily_moments', 'kids'];
 
 const supabase = DEMO ? null : createClient(SB_URL, KEY, {
   auth: { persistSession: true, autoRefreshToken: true },
@@ -249,6 +249,7 @@ function demoSeed() {
     ],
     daily_moments: [{ id: 'moment', date: d(0), at: new Date(Date.now() - 36e5).toISOString() }],
     photos: [],
+    kids: [{ id: 'kid-1', name: 'Jaime', emoji: '👶', color: '#f59e0b' }],
     jar_items: [
       r({ text: 'Piquenique no parque', status: 'jar', created_by: a }),
       r({ text: 'Noite de jogos de tabuleiro', status: 'jar', created_by: a }),

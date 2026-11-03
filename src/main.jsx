@@ -79,7 +79,7 @@ function Login() {
   return (
     <div class="login">
       <div class="login-logo"><Icon name="heart" size={40} /></div>
-      <h1>Nós Dois</h1>
+      <h1>{import.meta.env.VITE_APP_NAME}</h1>
       <p class="muted">A nossa casa, organizada.</p>
       <form class="form" onSubmit={submit}>
         <input type="email" placeholder="Email" autocomplete="username" required value={email} onInput={(e) => setEmail(e.target.value)} />

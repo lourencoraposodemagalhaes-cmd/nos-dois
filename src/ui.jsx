@@ -36,17 +36,21 @@ export function Icon({ name, size = 22 }) {
 // ---------- pessoas ----------
 export function usePeople() {
   const profiles = useTable('profiles');
+  const kids = useTable('kids'); // bebés / filhos / animais (sem conta própria)
   const me = profiles.find((p) => p.id === myId());
   const partner = profiles.find((p) => p.id !== myId());
   const byId = (id) => profiles.find((p) => p.id === id);
-  return { profiles, me, partner, byId };
+  const kidById = (id) => kids.find((k) => k.id === id);
+  return { profiles, kids, me, partner, byId, kidById };
 }
 
-/** Bolinha de cor da pessoa (ou das duas, se for "os dois"). */
-export function PersonDot({ person, size = 10 }) {
-  const { profiles, byId } = usePeople();
-  const p = person ? byId(person) : null;
+/** Bolinha de cor da pessoa (ou das duas, se for "os dois"; ou do bebé). */
+export function PersonDot({ person, kid, size = 10 }) {
+  const { profiles, byId, kidById } = usePeople();
   const style = { width: `${size}px`, height: `${size}px` }; // Preact 11 não acrescenta 'px' sozinho
+  const k = kid ? kidById(kid) : null;
+  if (k) return <span class="dot" style={{ ...style, background: k.color }} title={k.name} />;
+  const p = person ? byId(person) : null;
   if (p) return <span class="dot" style={{ ...style, background: p.color }} title={p.name} />;
   const [a, b] = profiles;
   return (
@@ -55,25 +59,34 @@ export function PersonDot({ person, size = 10 }) {
   );
 }
 
-export function personLabel(person, people) {
+/** Cor da barra de um evento/tarefa. */
+export function itemColor(item, people) {
+  return people.kidById(item.kid_id)?.color ?? people.byId(item.person)?.color ?? 'var(--both)';
+}
+
+export function personLabel(person, people, kid) {
+  const k = kid ? people.kidById(kid) : null;
+  if (k) return `${k.emoji ?? ''} ${k.name}`.trim();
   if (!person) return 'Os dois';
   return person === people.me?.id ? 'Eu' : people.byId(person)?.name ?? '—';
 }
 
-/** Escolher: eu / parceiro(a) / os dois. */
-export function PersonPicker({ value, onChange }) {
+/** Escolher: eu / parceiro(a) / os dois / (bebé). onChange(person, kidId). */
+export function PersonPicker({ value, kid = null, onChange }) {
   const people = usePeople();
   const opts = [
-    { id: people.me?.id, label: 'Eu' },
-    { id: people.partner?.id, label: people.partner?.name ?? 'Parceiro(a)' },
-    { id: null, label: 'Os dois' },
+    { person: people.me?.id, kid: null, label: 'Eu' },
+    { person: people.partner?.id, kid: null, label: people.partner?.name ?? 'Parceiro(a)' },
+    { person: null, kid: null, label: 'Os dois' },
+    ...people.kids.map((k) => ({ person: null, kid: k.id, label: `${k.emoji ?? ''} ${k.name}`.trim() })),
   ];
+  const on = (o) => (kid ? o.kid === kid : !o.kid && o.person === value);
   return (
-    <div class="segmented" role="radiogroup">
+    <div class={`segmented ${opts.length > 3 ? 'wrap' : ''}`} role="radiogroup">
       {opts.map((o) => (
-        <button type="button" role="radio" aria-checked={value === o.id}
-          class={value === o.id ? 'on' : ''} onClick={() => onChange(o.id)}>
-          <PersonDot person={o.id} /> {o.label}
+        <button type="button" role="radio" aria-checked={on(o)}
+          class={on(o) ? 'on' : ''} onClick={() => onChange(o.person, o.kid)}>
+          <PersonDot person={o.person} kid={o.kid} /> {o.label}
         </button>
       ))}
     </div>

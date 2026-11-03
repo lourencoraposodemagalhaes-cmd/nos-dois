@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { useTable, insert, update, remove } from '../lib/store.js';
 import { today, monthGrid, monthName, WEEK_SHORT, longDate, time, parse, nextOccurrence, eventDays, eventEnd, isMultiDay, rangeLabel } from '../lib/dates.js';
-import { Icon, PageHeader, PersonDot, PersonPicker, Sheet, Field, Fab, Empty, usePeople, personLabel } from '../ui.jsx';
+import { Icon, PageHeader, PersonDot, PersonPicker, Sheet, Field, Fab, Empty, usePeople, personLabel, itemColor } from '../ui.jsx';
 
 // Eventos de vários dias primeiro, depois por hora.
 export const sortEvents = (a, b) => (isMultiDay(b) - isMultiDay(a)) || (a.start_time ?? '').localeCompare(b.start_time ?? '');
@@ -51,7 +51,7 @@ export function Calendario() {
                 <span class="num">{c.day}</span>
                 <span class="marks">
                   {sp && <span class="heart-mark"><Icon name="heart" size={8} /></span>}
-                  {evs.slice(0, 3).map((e) => <PersonDot person={e.person} size={5} />)}
+                  {evs.slice(0, 3).map((e) => <PersonDot person={e.person} kid={e.kid_id} size={5} />)}
                 </span>
               </button>
             );
@@ -100,10 +100,10 @@ export function EventRow({ event, onClick, showDate, day }) {
   return (
     <button class="card item" onClick={onClick}>
       <div class="time-col">{timeCol}</div>
-      <span class="bar" style={{ background: people.byId(event.person)?.color ?? 'var(--both)' }} />
+      <span class="bar" style={{ background: itemColor(event, people) }} />
       <div class="grow">
         <strong>{event.title}</strong>
-        <small>{when ? `${when} · ` : ''}{personLabel(event.person, people)}{event.notes ? ` · ${event.notes}` : ''}</small>
+        <small>{when ? `${when} · ` : ''}{personLabel(event.person, people, event.kid_id)}{event.notes ? ` · ${event.notes}` : ''}</small>
       </div>
     </button>
   );
@@ -127,6 +127,7 @@ export function EventSheet({ event, onClose }) {
     };
     // Só envia end_date quando é preciso (compatível com bases de dados antigas).
     if (endDate || event.end_date) row.end_date = endDate;
+    if (f.kid_id || event.kid_id) row.kid_id = f.kid_id ?? null;
     isNew ? insert('events', row) : update('events', event.id, row);
     onClose();
   };
@@ -144,7 +145,7 @@ export function EventSheet({ event, onClose }) {
       onDelete={!isNew && (() => remove('events', event.id))}>
       <form onSubmit={save} class="form">
         <input class="big-input" placeholder="O que é?" value={f.title} onInput={set('title')} autofocus={isNew} />
-        <Field label="Quem"><PersonPicker value={f.person} onChange={(person) => setF({ ...f, person })} /></Field>
+        <Field label="Quem"><PersonPicker value={f.person} kid={f.kid_id} onChange={(person, kid_id) => setF({ ...f, person, kid_id })} /></Field>
         <label class="switch-row">
           <span>Vários dias</span>
           <input type="checkbox" class="switch" checked={multi} onChange={(e) => toggleMulti(e.target.checked)} />

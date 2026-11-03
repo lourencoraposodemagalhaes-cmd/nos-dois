@@ -1,11 +1,13 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // No GitHub Pages a app vive em /<nome-do-repo>/ (definido no workflow).
 const base = process.env.BASE_PATH || '/';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const name = loadEnv(mode, process.cwd(), '').VITE_APP_NAME || 'Nós Dois';
+  return {
   base,
   plugins: [
     preact(),
@@ -13,8 +15,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'push-sw.js'],
       manifest: {
-        name: 'Nós Dois',
-        short_name: 'Nós Dois',
+        name,
+        short_name: name,
         description: 'Calendário, tarefas, compras e datas especiais — só para os dois.',
         lang: 'pt-PT',
         display: 'standalone',
@@ -35,4 +37,5 @@ export default defineConfig({
       },
     }),
   ],
+};
 });

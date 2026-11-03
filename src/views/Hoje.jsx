@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { useTable, update, signOut, myId, DEMO, sendTestPush } from '../lib/store.js';
+import { useTable, update, insert, remove, signOut, myId, DEMO, sendTestPush } from '../lib/store.js';
 import { pushStatus, enablePush, disablePush } from '../lib/push.js';
 import { today, addDays, longDate, friendly, eventCovers } from '../lib/dates.js';
 import { Icon, PageHeader, Sheet, Field, usePeople } from '../ui.jsx';
@@ -124,6 +124,7 @@ function Settings({ onClose }) {
         </Field>
         <button class="btn primary" type="submit">Guardar</button>
         <Field label="Notificações"><PushControls /></Field>
+        <Family />
         {!DEMO && <button class="btn ghost" type="button" onClick={() => { signOut(); onClose(); }}>Terminar sessão</button>}
         {DEMO && <p class="hint">Modo demonstração: os dados ficam só neste dispositivo. Liga o Supabase para sincronizar entre os dois.</p>}
       </form>
@@ -176,7 +177,7 @@ function PushControls() {
   if (status === null) return <p class="hint">A verificar…</p>;
   if (status === 'install') return <p class="hint">No iPhone, as notificações só funcionam com a app adicionada ao ecrã principal (Safari → Partilhar → Adicionar ao ecrã principal).</p>;
   if (status === 'unsupported') return <p class="hint">Este dispositivo não suporta notificações.</p>;
-  if (status === 'denied') return <p class="hint">As notificações estão bloqueadas. Ativa-as em Definições do iPhone → Notificações → Nós Dois.</p>;
+  if (status === 'denied') return <p class="hint">As notificações estão bloqueadas. Ativa-as nas definições do telemóvel → Notificações → {import.meta.env.VITE_APP_NAME}.</p>;
   return (
     <div class="form">
       {status === 'on' ? (
@@ -193,5 +194,43 @@ function PushControls() {
       )}
       {msg && <p class="hint">{msg}</p>}
     </div>
+  );
+}
+
+// ---------- família (bebés, filhos, animais: sem conta própria) ----------
+const KID_EMOJI = ['👶', '🧒', '👧', '👦', '🐶', '🐱'];
+
+function Family() {
+  const { kids } = usePeople();
+  const [name, setName] = useState('');
+  const [emoji, setEmoji] = useState('👶');
+  if (!kids.length && !import.meta.env.VITE_KIDS) return null;
+  const add = () => {
+    if (!name.trim()) return;
+    insert('kids', { name: name.trim(), emoji, color: COLORS[(kids.length + 3) % COLORS.length] });
+    setName('');
+  };
+  return (
+    <Field label="Família">
+      <div class="form">
+        {kids.map((k) => (
+          <div class="kid-row">
+            <span class="dot" style={{ width: '12px', height: '12px', background: k.color }} />
+            <span class="grow">{k.emoji} {k.name}</span>
+            <button type="button" class="icon-btn danger" aria-label={`Remover ${k.name}`}
+              onClick={() => confirm(`Remover ${k.name}? Os eventos e tarefas ficam, mas passam a ser "dos dois".`) && remove('kids', k.id)}>
+              <Icon name="trash" size={18} />
+            </button>
+          </div>
+        ))}
+        <div class="row gap-s">
+          <select value={emoji} onChange={(e) => setEmoji(e.target.value)} style={{ width: '76px', flex: 'none' }} aria-label="Emoji">
+            {KID_EMOJI.map((e) => <option value={e}>{e}</option>)}
+          </select>
+          <input placeholder="Nome (ex: Jaime)" value={name} onInput={(e) => setName(e.target.value)} />
+          <button type="button" class="btn primary sm" onClick={add} aria-label="Adicionar"><Icon name="plus" /></button>
+        </div>
+      </div>
+    </Field>
   );
 }
