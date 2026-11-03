@@ -8,7 +8,7 @@ const URL = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const DEMO = !URL || !KEY;
-export const TABLES = ['profiles', 'events', 'tasks', 'shopping_items', 'special_dates'];
+export const TABLES = ['profiles', 'events', 'tasks', 'shopping_items', 'special_dates', 'jar_items'];
 
 const supabase = DEMO ? null : createClient(URL, KEY, {
   auth: { persistSession: true, autoRefreshToken: true },
@@ -137,6 +137,8 @@ let channel = null;
 async function loadAll() {
   const results = await Promise.all(TABLES.map((t) => supabase.from(t).select('*')));
   results.forEach(({ data, error }, i) => {
+    // Tabela ainda não criada (funcionalidade nova antes do SQL): ignora em silêncio.
+    if (error && (error.code === '42P01' || error.code === 'PGRST205')) { console.warn(error.message); return; }
     if (error) report(error);
     else state[TABLES[i]] = data;
   });
@@ -221,6 +223,14 @@ function demoSeed() {
     special_dates: [
       r({ title: 'O nosso aniversário', date: '2019-' + d(12).slice(5), kind: 'anniversary', yearly: true }),
       r({ title: 'Aniversário da Beatriz', date: '1995-' + d(40).slice(5), kind: 'birthday', yearly: true }),
+    ],
+    jar_items: [
+      r({ text: 'Piquenique no parque', status: 'jar', created_by: a }),
+      r({ text: 'Noite de jogos de tabuleiro', status: 'jar', created_by: a }),
+      r({ text: 'Cozinhar um prato que nunca fizemos', status: 'jar', created_by: b }),
+      r({ text: 'Ver o pôr do sol na praia', status: 'jar', created_by: b }),
+      r({ text: 'Ir ao cinema às escuras (escolhe o outro)', status: 'jar', created_by: b }),
+      r({ text: 'Passeio de bicicleta', status: 'done', created_by: a, drawn_at: new Date(Date.now() - 864e6).toISOString(), done_at: new Date(Date.now() - 6e8).toISOString() }),
     ],
   };
 }

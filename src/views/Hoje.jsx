@@ -17,6 +17,7 @@ export function Hoje({ go }) {
   const tasks = useTable('tasks');
   const items = useTable('shopping_items');
   const specials = useTable('special_dates');
+  const jar = useTable('jar_items');
   const people = usePeople();
   const [settings, setSettings] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -49,6 +50,11 @@ export function Hoje({ go }) {
         <button class="card tile" onClick={() => go('compras')}>
           <span class="tile-ico t-shop"><Icon name="cart" /></span>
           <b>{shopping}</b><small>{shopping === 1 ? 'item a comprar' : 'itens a comprar'}</small>
+        </button>
+        <button class="card tile wide" onClick={() => go('jarro')}>
+          <span class="tile-ico t-jar"><Icon name="jar" /></span>
+          <div class="grow"><small>Jarro de atividades</small><strong>{jar.filter((j) => j.status === 'jar').length} papéis à espera</strong></div>
+          <span class="badge strong">Tirar 🎲</span>
         </button>
         {next && (
           <button class="card tile wide" onClick={() => go('datas')}>

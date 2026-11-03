@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { useTable, insert, update, remove } from '../lib/store.js';
 import { nextOccurrence, shortDate, friendly, today } from '../lib/dates.js';
 import { Icon, PageHeader, Sheet, Field, Fab, Empty } from '../ui.jsx';
+import { NosSwitch } from './Jarro.jsx';
 
 export const KINDS = {
   anniversary: { label: 'Aniversário de casal', icon: 'rings', noun: 'anos juntos' },
@@ -32,6 +33,7 @@ export function Datas() {
   return (
     <section>
       <PageHeader title="Datas especiais" subtitle="Para não esquecer" />
+      <NosSwitch current="datas" />
       {specials.length === 0 && <Empty icon="heart" title="Ainda sem datas" text="Aniversários, o dia em que se conheceram, viagens…" />}
 
       {list[0] && <Hero s={list[0]} onClick={() => setEditing(list[0])} />}

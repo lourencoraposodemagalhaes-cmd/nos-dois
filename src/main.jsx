@@ -8,6 +8,7 @@ import { Calendario } from './views/Calendario.jsx';
 import { Tarefas } from './views/Tarefas.jsx';
 import { Compras } from './views/Compras.jsx';
 import { Datas } from './views/Datas.jsx';
+import { Jarro } from './views/Jarro.jsx';
 import './styles.css';
 
 const TABS = [
@@ -15,10 +16,13 @@ const TABS = [
   { id: 'calendario', label: 'Calendário', icon: 'calendar', View: Calendario },
   { id: 'tarefas', label: 'Tarefas', icon: 'check', View: Tarefas },
   { id: 'compras', label: 'Compras', icon: 'cart', View: Compras },
-  { id: 'datas', label: 'Datas', icon: 'heart', View: Datas },
+  { id: 'datas', label: 'Nós', icon: 'heart', View: Datas, also: ['jarro'] },
 ];
 
-const readTab = () => { const h = location.hash.slice(1); return TABS.some((t) => t.id === h) ? h : 'hoje'; };
+// Páginas que não têm separador próprio (vivem dentro de outro).
+const PAGES = { ...Object.fromEntries(TABS.map((t) => [t.id, t.View])), jarro: Jarro };
+
+const readTab = () => { const h = location.hash.slice(1); return Object.hasOwn(PAGES, h) ? h : 'hoje'; };
 
 function App() {
   const { session, loaded } = useSession();
@@ -37,13 +41,13 @@ function App() {
   if (!session) return <Login />;
   if (!loaded) return <div class="splash"><div class="spinner" /></div>;
 
-  const { View } = TABS.find((t) => t.id === tab);
+  const View = PAGES[tab];
   return (
     <>
       <main class="page"><View go={go} /></main>
       <nav class="tabbar">
         {TABS.map((t) => (
-          <a href={`#${t.id}`} class={t.id === tab ? 'on' : ''} onClick={() => window.scrollTo(0, 0)}>
+          <a href={`#${t.id}`} class={t.id === tab || t.also?.includes(tab) ? 'on' : ''} onClick={() => window.scrollTo(0, 0)}>
             <Icon name={t.icon} size={24} />
             <span>{t.label}</span>
           </a>

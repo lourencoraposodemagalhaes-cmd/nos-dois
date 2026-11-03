@@ -245,3 +245,41 @@ small { color: var(--muted); font-size: 13px; }
 .push-banner { display: flex; align-items: center; gap: 12px; padding: 12px 8px 12px 14px; margin-bottom: 10px; }
 .push-banner strong { font-weight: 650; }
 .pill.accent { background: var(--accent); color: #fff; }
+
+/* ---------- jarro ---------- */
+.segmented a { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 6px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-decoration: none; }
+.segmented a.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / 0.1); }
+.jar-card { display: flex; flex-direction: column; align-items: center; padding: 18px 16px 10px; margin-bottom: 14px; }
+.jar-art { width: 170px; height: 187px; transform-origin: 50% 90%; }
+.jar-art.shake { animation: shake 0.9s ease-in-out; }
+@keyframes shake {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(-12deg); } 30% { transform: rotate(10deg); }
+  45% { transform: rotate(-9deg); } 60% { transform: rotate(7deg); }
+  75% { transform: rotate(-4deg); } 90% { transform: rotate(2deg); }
+}
+.jar-lid { fill: var(--accent); }
+.jar-glass { fill: color-mix(in srgb, var(--soft) 60%, transparent); stroke: var(--muted); stroke-width: 2.5; }
+.jar-shine { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; opacity: 0.6; }
+.jar-btn { margin-top: 14px; }
+.center { text-align: center; }
+.t-jar { background: #fef3c7; color: #b45309; }
+@media (prefers-color-scheme: dark) { .t-jar { background: #3b2a06; color: #fcd34d; } }
+.item .wrap { white-space: normal; }
+.jar-drawn { align-items: flex-start; }
+.jar-actions { margin-top: 10px; }
+.jar-actions .pill { font-size: 13px; }
+.jar-done-row { gap: 8px; padding-right: 4px; }
+.reveal-backdrop { align-items: center; padding: 24px; }
+.paper {
+  width: 100%; max-width: 360px; background: #fffbea; color: #3b2f1e;
+  border-radius: 6px; padding: 28px 22px 20px; text-align: center;
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.3); transform: rotate(-1.5deg);
+  animation: pop 0.45s cubic-bezier(.2,1.4,.4,1);
+}
+.paper h2 { font-size: 26px; font-weight: 750; line-height: 1.2; letter-spacing: -0.01em; }
+.paper .eyebrow, .paper small { color: #8a7a5c; }
+.paper .btn.ghost { background: #f3ead0; color: #3b2f1e; font-size: 14px; height: 44px; }
+.paper .row > * { flex: 1; }
+@keyframes pop { from { transform: scale(0.4) rotate(-12deg); opacity: 0; } }
