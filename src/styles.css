@@ -338,3 +338,15 @@ small { color: var(--muted); font-size: 13px; }
 .segmented.wrap { flex-wrap: wrap; }
 .segmented.wrap button { flex: 1 1 40%; }
 .kid-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border-radius: 14px; }
+
+/* ---------- contas e casas ---------- */
+.auth-links { display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
+.muted-link { color: var(--muted); font-weight: 500; }
+.info { color: var(--text); background: var(--accent-soft); padding: 10px 12px; border-radius: 12px; font-size: 14px; }
+.choice { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 16px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); text-align: center; }
+.choice span { font-size: 32px; }
+.choice b { font-size: 17px; }
+.code-input { text-align: center; font-size: 24px !important; letter-spacing: 0.2em; font-weight: 700; }
+.invite { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 16px; margin-bottom: 12px; text-align: center; background: linear-gradient(160deg, var(--accent-soft), var(--card) 70%); }
+.invite .code { font-size: 32px; font-weight: 800; letter-spacing: 0.15em; font-variant-numeric: tabular-nums; }
+.invite .btn { margin-top: 6px; }

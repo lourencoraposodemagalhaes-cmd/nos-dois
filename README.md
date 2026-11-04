@@ -1,5 +1,10 @@
 # Nós Dois 💛
 
+> **Várias casas:** uma só instalação serve muitos casais. Cada pessoa cria conta,
+> cria a sua casa ou entra na do par com um código de convite. Cada casa só vê os seus dados
+> (regras RLS no Postgres, testadas em `supabase/tests/isolamento.test.mjs` → `npm run test:db`).
+> Instalação nova: correr `supabase/setup.sql`. Instalação antiga de um casal: correr `supabase/multi.sql`.
+
 App privada para dois: **calendário**, **tarefas**, **lista de compras** e **datas especiais**,
 sincronizada em tempo real entre os dois iPhones.
 

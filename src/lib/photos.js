@@ -1,6 +1,6 @@
 // Fotos: redimensionar antes de enviar e obter endereços para as mostrar.
 import { useEffect, useState } from 'preact/hooks';
-import { uploadFile, signedUrls, insert, myId } from './store.js';
+import { uploadFile, signedUrls, insert, myId, myHousehold } from './store.js';
 import { today } from './dates.js';
 
 const MAX = 1600; // px no lado maior: chega para o ecrã e poupa espaço
@@ -18,7 +18,8 @@ export async function shrink(file) {
 
 export async function postPhoto(file, { kind = 'daily', date = today(), caption = null, late = false } = {}) {
   const blob = await shrink(file);
-  const path = `${date}/${myId()}-${Date.now()}.jpg`;
+  // Cada casa tem a sua pasta: as regras do Storage só deixam usar a própria.
+  const path = `${myHousehold()}/${date}/${myId()}-${Date.now()}.jpg`;
   await uploadFile(path, blob);
   return insert('photos', { kind, date, path, caption, late });
 }

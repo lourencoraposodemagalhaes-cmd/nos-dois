@@ -17,7 +17,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 
 const TZ = 'Europe/Lisbon';
 const MORNING = 8 * 60; // 8:00
-const APP_URL = 'https://lourencoraposodemagalhaes-cmd.github.io/nos-dois/';
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://lourencoraposodemagalhaes-cmd.github.io/nos-dois/';
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
   auth: { persistSession: false },
@@ -120,20 +120,24 @@ function lisbonToUtc(date: string, minutes: number) {
   return new Date(guess - offset * 60000);
 }
 
-async function photoMoment(today: string, people: Row[]) {
-  let { data: moment } = await db.from('daily_moments').select('*').eq('date', today).maybeSingle();
+// Cada casa é tratada à parte: o servidor usa a chave de serviço (ignora o RLS),
+// por isso TODAS as consultas abaixo filtram explicitamente por household_id.
+
+async function photoMoment(house: string, today: string, people: Row[]) {
+  const get = () => db.from('daily_moments').select('*').eq('household_id', house).eq('date', today).maybeSingle();
+  let { data: moment } = await get();
   if (!moment) {
     const dow = parse(today).getUTCDay();
     const [a, b] = dow === 0 || dow === 6 ? PHOTO_WINDOW.weekend : PHOTO_WINDOW.weekday;
-    const minutes = a + Math.floor(Math.random() * (b - a));
-    await db.from('daily_moments').upsert({ date: today, at: lisbonToUtc(today, minutes).toISOString() },
-      { onConflict: 'date', ignoreDuplicates: true });
-    ({ data: moment } = await db.from('daily_moments').select('*').eq('date', today).maybeSingle());
+    const minutes = a + Math.floor(Math.random() * (b - a)); // hora diferente para cada casa
+    await db.from('daily_moments').upsert({ household_id: house, date: today, at: lisbonToUtc(today, minutes).toISOString() },
+      { onConflict: 'household_id,date', ignoreDuplicates: true });
+    ({ data: moment } = await get());
   }
   if (!moment || moment.notified_at || new Date(moment.at) > new Date()) return;
   // Marca como avisado só se ainda não estava (evita avisos repetidos).
   const { data: claimed } = await db.from('daily_moments').update({ notified_at: new Date().toISOString() })
-    .eq('date', today).is('notified_at', null).select();
+    .eq('household_id', house).eq('date', today).is('notified_at', null).select();
   if (!claimed?.length) return;
   await send(people.map((p: Row) => p.id), {
     title: '📸 Hora da foto do dia!', body: 'Mostra ao outro o que estás a fazer agora mesmo.', url: '#hoje', tag: `photo-${today}`,
@@ -144,13 +148,26 @@ async function photoMoment(today: string, people: Row[]) {
 async function tick() {
   const now = lisbonNow();
   const today = now.date;
-  const [{ data: profiles }, { data: events }] = await Promise.all([
-    db.from('profiles').select('*'),
-    db.from('events').select('*').lte('date', addDays(today, 1)).gte('date', addDays(today, -366)),
-  ]);
-  const people = profiles ?? [];
+  const morning = now.minutes >= MORNING && now.minutes < MORNING + 60;
 
-  await photoMoment(today, people);
+  const { data: profiles } = await db.from('profiles').select('*').not('household_id', 'is', null);
+  const byHouse = new Map<string, Row[]>();
+  for (const p of profiles ?? []) byHouse.set(p.household_id, [...(byHouse.get(p.household_id) ?? []), p]);
+
+  for (const [house, people] of byHouse) {
+    try { await tickHouse(house, people, now, today, morning); }
+    catch (e) { console.error('casa', house, e); } // uma casa com problemas não trava as outras
+  }
+
+  // Limpeza do registo (mais de 30 dias).
+  await db.from('push_log').delete().lt('created_at', new Date(Date.now() - 30 * 86400000).toISOString());
+}
+
+async function tickHouse(house: string, people: Row[], now: { minutes: number }, today: string, morning: boolean) {
+  await photoMoment(house, today, people);
+
+  const { data: events } = await db.from('events').select('*').eq('household_id', house)
+    .lte('date', addDays(today, 1)).gte('date', addDays(today, -366));
 
   // Lembrete 30 min antes (no 1.º dia de cada evento com hora).
   for (const e of events ?? []) {
@@ -166,11 +183,11 @@ async function tick() {
   }
 
   // Resumo da manhã + datas especiais (uma vez por dia, a partir das 8:00).
-  if (now.minutes < MORNING || now.minutes >= MORNING + 60) return;
+  if (!morning) return;
 
   const [{ data: tasks }, { data: specials }] = await Promise.all([
-    db.from('tasks').select('*').eq('done', false).lte('due_date', today),
-    db.from('special_dates').select('*'),
+    db.from('tasks').select('*').eq('household_id', house).eq('done', false).lte('due_date', today),
+    db.from('special_dates').select('*').eq('household_id', house),
   ]);
 
   for (const s of specials ?? []) {
@@ -206,25 +223,24 @@ async function tick() {
     }
     await send([p.id], { title: `☀️ Bom dia, ${p.name}`, body: lines.join('\n'), url: '#hoje', tag: `morning-${today}` });
   }
-
-  // Limpeza do registo (mais de 30 dias).
-  await db.from('push_log').delete().lt('created_at', new Date(Date.now() - 30 * 86400000).toISOString());
 }
 
 // ---------- "quando o outro mexe" ----------
 async function change(msg: Row) {
   const r = msg.record as Row;
   const actorId = msg.actor as string | null;
-  const { data: profiles } = await db.from('profiles').select('*');
+  if (!actorId || !r.household_id) return;
+  // Só pessoas da MESMA casa do registo.
+  const { data: profiles } = await db.from('profiles').select('*').eq('household_id', r.household_id);
   const actor = profiles?.find((p: Row) => p.id === actorId);
   const other = profiles?.find((p: Row) => p.id !== actorId);
   if (!actor || !other) return;
   if (r.person && r.person !== other.id) return; // é só de quem o criou
 
   const today = lisbonNow().date;
-  // Bebé / filho (tabela opcional "kids").
+  // Bebé / filho (da mesma casa).
   let kid: Row | null = null;
-  if (r.kid_id) ({ data: kid } = await db.from('kids').select('*').eq('id', r.kid_id).maybeSingle());
+  if (r.kid_id) ({ data: kid } = await db.from('kids').select('*').eq('id', r.kid_id).eq('household_id', r.household_id).maybeSingle());
   const kidLabel = kid ? `${kid.emoji ?? ''} ${kid.name}`.trim() : null;
   if (msg.table === 'events') {
     const when = friendly(r.date, today) + (r.end_date && r.end_date > r.date ? ` até ${friendly(r.end_date, today)}` : '')
@@ -235,7 +251,7 @@ async function change(msg: Row) {
     });
   } else if (msg.table === 'photos') {
     if (r.kind === 'daily') {
-      const { data: theirs } = await db.from('photos').select('id')
+      const { data: theirs } = await db.from('photos').select('id').eq('household_id', r.household_id)
         .eq('kind', 'daily').eq('date', r.date).eq('created_by', other.id).limit(1);
       await send([other.id], {
         title: `📸 ${actor.name} publicou a foto do dia`,

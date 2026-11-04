@@ -8,7 +8,7 @@ const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const DEMO = !SB_URL || !KEY;
-export const TABLES = ['profiles', 'events', 'tasks', 'shopping_items', 'special_dates', 'jar_items', 'photos', 'daily_moments', 'kids'];
+export const TABLES = ['profiles', 'events', 'tasks', 'shopping_items', 'special_dates', 'jar_items', 'photos', 'daily_moments', 'kids', 'households'];
 
 const supabase = DEMO ? null : createClient(SB_URL, KEY, {
   auth: { persistSession: true, autoRefreshToken: true },
@@ -27,13 +27,17 @@ function setRows(table, rows) {
   emit();
 }
 
+// Chave de cada linha (o momento da foto não tem id: é um por casa e por dia).
+const keyOf = (row) => row.id ?? `${row.household_id}:${row.date}`;
+
 function upsertLocal(table, row) {
   const rows = state[table];
-  const i = rows.findIndex((r) => r.id === row.id);
+  const i = rows.findIndex((r) => keyOf(r) === keyOf(row));
   setRows(table, i === -1 ? [...rows, row] : rows.map((r, j) => (j === i ? { ...r, ...row } : r)));
 }
 
 function removeLocal(table, id) {
+  if (id === undefined) return;
   setRows(table, state[table].filter((r) => r.id !== id));
 }
 
@@ -48,6 +52,8 @@ export function useTable(table) {
   return state[table];
 }
 
+let recovering = false; // a pessoa abriu o link "esqueci-me da palavra-passe"
+
 /** Hook: sessão atual e se os dados já carregaram. */
 export function useSession() {
   const [, force] = useState(0);
@@ -56,10 +62,11 @@ export function useSession() {
     listeners.add(fn);
     return () => listeners.delete(fn);
   }, []);
-  return { session, loaded };
+  return { session, loaded, recovering };
 }
 
 export const myId = () => session?.user?.id ?? null;
+export const myHousehold = () => state.profiles.find((p) => p.id === myId())?.household_id ?? null;
 
 // ---------- escrita ----------
 const uuid = () => crypto.randomUUID();
@@ -149,6 +156,55 @@ export async function sendTestPush() {
   return data;
 }
 
+const appUrl = () => location.origin + location.pathname;
+
+/** Criar conta. Devolve true se for preciso confirmar o email antes de entrar. */
+export async function signUp(email, password, name) {
+  const { data, error } = await supabase.auth.signUp({
+    email, password, options: { data: { name }, emailRedirectTo: appUrl() },
+  });
+  if (error) throw error;
+  return !data.session;
+}
+
+export async function resetPassword(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: appUrl() });
+  if (error) throw error;
+}
+
+export async function updatePassword(password) {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+  recovering = false;
+  emit();
+}
+
+// ---------- casa ----------
+async function rpc(fn, args) {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function createHousehold(name) {
+  if (DEMO) return;
+  await rpc('create_household', { house_name: name });
+  await loadAll(); subscribe();
+}
+
+export async function joinHousehold(code) {
+  if (DEMO) return;
+  await rpc('join_household', { code });
+  await loadAll(); subscribe();
+}
+
+/** Apaga a conta (e os dados da casa, se for o último a sair). */
+export async function deleteAccount() {
+  if (DEMO) return;
+  await rpc('delete_my_account');
+  await supabase.auth.signOut({ scope: 'local' });
+}
+
 export async function signOut() {
   if (DEMO) return;
   await supabase.auth.signOut();
@@ -183,7 +239,8 @@ function subscribe() {
 
 export function start() {
   if (DEMO) return startDemo();
-  supabase.auth.onAuthStateChange((_event, s) => {
+  supabase.auth.onAuthStateChange((event, s) => {
+    if (event === 'PASSWORD_RECOVERY') recovering = true;
     const changedUser = s?.user?.id !== session?.user?.id;
     session = s;
     if (!s) { loaded = false; TABLES.forEach((t) => (state[t] = [])); channel?.unsubscribe(); emit(); return; }
@@ -223,9 +280,10 @@ function demoSeed() {
   const r = (o) => ({ id: uuid(), created_at: new Date().toISOString(), ...o });
   return {
     profiles: [
-      { id: a, name: 'Lourenço', color: '#3b82f6' },
-      { id: b, name: 'Beatriz', color: '#f43f5e' },
+      { id: a, name: 'Lourenço', color: '#3b82f6', household_id: 'demo-house' },
+      { id: b, name: 'Beatriz', color: '#f43f5e', household_id: 'demo-house' },
     ],
+    households: [{ id: 'demo-house', name: 'A nossa casa', invite_code: 'DEMO2026' }],
     events: [
       r({ title: 'Jantar com os pais', date: d(0), start_time: '20:00', person: null }),
       r({ title: 'Dentista', date: d(2), start_time: '09:30', person: b }),

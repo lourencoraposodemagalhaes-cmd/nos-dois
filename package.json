@@ -4,13 +4,15 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "test:db": "node supabase/tests/isolamento.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
     "preact": "^11.1.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
     "@preact/preset-vite": "^2.10.6",
     "vite": "^8.3.5",
     "vite-plugin-pwa": "^2.0.0"

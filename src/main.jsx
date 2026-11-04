@@ -1,7 +1,8 @@
 import { render } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { registerSW } from 'virtual:pwa-register';
-import { start, useSession, signIn, onError, DEMO } from './lib/store.js';
+import { start, useSession, onError, useTable, myId, DEMO } from './lib/store.js';
+import { AuthScreen, NewPassword, Onboarding } from './views/Conta.jsx';
 import { Icon } from './ui.jsx';
 import { Hoje } from './views/Hoje.jsx';
 import { Calendario } from './views/Calendario.jsx';
@@ -26,7 +27,8 @@ const PAGES = { ...Object.fromEntries(TABS.map((t) => [t.id, t.View])), jarro: J
 const readTab = () => { const h = location.hash.slice(1); return Object.hasOwn(PAGES, h) ? h : 'hoje'; };
 
 function App() {
-  const { session, loaded } = useSession();
+  const { session, loaded, recovering } = useSession();
+  const profiles = useTable('profiles');
   const [tab, setTab] = useState(readTab);
   const [toast, setToast] = useState(null);
   const [photoOpen, setPhotoOpen] = useState(false);
@@ -41,8 +43,11 @@ function App() {
 
   const go = (id) => { location.hash = id; window.scrollTo(0, 0); };
 
-  if (!session) return <Login />;
+  if (recovering) return <NewPassword />;
+  if (!session) return <AuthScreen />;
   if (!loaded) return <div class="splash"><div class="spinner" /></div>;
+  const me = profiles.find((p) => p.id === myId());
+  if (!DEMO && !me?.household_id) return <Onboarding />;
 
   const View = PAGES[tab];
   return (
@@ -62,34 +67,6 @@ function App() {
   );
 }
 
-function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true); setError('');
-    try { await signIn(email.trim(), password); }
-    catch (err) { setError(err.message === 'Invalid login credentials' ? 'Email ou palavra-passe errados.' : err.message); }
-    finally { setBusy(false); }
-  };
-
-  return (
-    <div class="login">
-      <div class="login-logo"><Icon name="heart" size={40} /></div>
-      <h1>{import.meta.env.VITE_APP_NAME}</h1>
-      <p class="muted">A nossa casa, organizada.</p>
-      <form class="form" onSubmit={submit}>
-        <input type="email" placeholder="Email" autocomplete="username" required value={email} onInput={(e) => setEmail(e.target.value)} />
-        <input type="password" placeholder="Palavra-passe" autocomplete="current-password" required value={password} onInput={(e) => setPassword(e.target.value)} />
-        {error && <p class="error">{error}</p>}
-        <button class="btn primary" disabled={busy}>{busy ? 'A entrar…' : 'Entrar'}</button>
-      </form>
-    </div>
-  );
-}
 
 if (DEMO) console.info('Nós Dois: modo demonstração (sem Supabase configurado).');
 start();

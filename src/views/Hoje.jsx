@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { useTable, update, insert, remove, signOut, myId, DEMO, sendTestPush } from '../lib/store.js';
+import { useTable, update, insert, remove, signOut, deleteAccount, myId, myHousehold, DEMO, sendTestPush } from '../lib/store.js';
 import { pushStatus, enablePush, disablePush } from '../lib/push.js';
 import { today, addDays, longDate, friendly, eventCovers } from '../lib/dates.js';
 import { Icon, PageHeader, Sheet, Field, usePeople } from '../ui.jsx';
@@ -7,6 +7,7 @@ import { EventRow, EventSheet, sortEvents, specialsOn } from './Calendario.jsx';
 import { TaskRow, sortTasks } from './Tarefas.jsx';
 import { upcomingSpecials, countdown, KINDS } from './Datas.jsx';
 import { usePhotoPending } from './Foto.jsx';
+import { InviteCard } from './Conta.jsx';
 
 function greeting() {
   const h = new Date().getHours();
@@ -19,6 +20,7 @@ export function Hoje({ go }) {
   const items = useTable('shopping_items');
   const specials = useTable('special_dates');
   const jar = useTable('jar_items');
+  const households = useTable('households');
   const people = usePeople();
   const [settings, setSettings] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -45,6 +47,7 @@ export function Hoje({ go }) {
           </div>
         } />
 
+      {people.profiles.length === 1 && <InviteCard house={households.find((h) => h.id === myHousehold())} />}
       <PushBanner />
 
       {todaySpecials.map((s) => (
@@ -125,6 +128,7 @@ function Settings({ onClose }) {
         <button class="btn primary" type="submit">Guardar</button>
         <Field label="Notificações"><PushControls /></Field>
         <Family />
+        <House />
         {!DEMO && <button class="btn ghost" type="button" onClick={() => { signOut(); onClose(); }}>Terminar sessão</button>}
         {DEMO && <p class="hint">Modo demonstração: os dados ficam só neste dispositivo. Liga o Supabase para sincronizar entre os dois.</p>}
       </form>
@@ -204,7 +208,6 @@ function Family() {
   const { kids } = usePeople();
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('👶');
-  if (!kids.length && !import.meta.env.VITE_KIDS) return null;
   const add = () => {
     if (!name.trim()) return;
     insert('kids', { name: name.trim(), emoji, color: COLORS[(kids.length + 3) % COLORS.length] });
@@ -230,6 +233,31 @@ function Family() {
           <input placeholder="Nome (ex: Jaime)" value={name} onInput={(e) => setName(e.target.value)} />
           <button type="button" class="btn primary sm" onClick={add} aria-label="Adicionar"><Icon name="plus" /></button>
         </div>
+      </div>
+    </Field>
+  );
+}
+
+// ---------- casa e conta ----------
+function House() {
+  const house = useTable('households').find((h) => h.id === myHousehold());
+  const { profiles } = usePeople();
+  const [busy, setBusy] = useState(false);
+  const del = async () => {
+    const alone = profiles.length === 1;
+    const warn = alone
+      ? 'Vais apagar a tua conta e TODOS os dados da casa (calendário, tarefas, fotos…). Não dá para desfazer. Continuar?'
+      : 'Vais apagar a tua conta. Os dados da casa ficam para o teu par. Não dá para desfazer. Continuar?';
+    if (!confirm(warn)) return;
+    setBusy(true);
+    try { await deleteAccount(); } catch (e) { alert(e.message); setBusy(false); }
+  };
+  return (
+    <Field label="Casa">
+      <div class="form">
+        {house && <div class="kid-row"><span class="grow">🏡 {house.name}</span><small>{profiles.length}/2</small></div>}
+        {house && profiles.length === 1 && <p class="hint">Código para o teu par: <b>{house.invite_code}</b></p>}
+        {!DEMO && <button type="button" class="link-btn danger" disabled={busy} onClick={del}>Apagar a minha conta</button>}
       </div>
     </Field>
   );
