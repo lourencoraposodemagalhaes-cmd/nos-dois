@@ -60,23 +60,53 @@ export function monthGrid(year, month) {
   });
 }
 
-/** Próxima ocorrência (>= hoje) de uma data especial, e quantos anos faz. */
-export function nextOccurrence(special, from = today()) {
-  if (!special.yearly) {
-    return { date: special.date, days: daysBetween(from, special.date), years: null };
-  }
-  const [y, m, d] = special.date.split('-').map(Number);
-  const fy = parse(from).getFullYear();
-  const at = (year) => {
-    // 29 fev em anos não bissextos → 28 fev
-    const last = new Date(year, m, 0).getDate();
-    return toISO(new Date(year, m - 1, Math.min(d, last)));
-  };
-  let next = at(fy);
-  if (next < from) next = at(fy + 1);
-  const years = parse(next).getFullYear() - y;
-  return { date: next, days: daysBetween(from, next), years: years > 0 ? years : null };
+/** Repetição de uma data especial ('none' | 'daily' | 'weekly' | 'monthly' | 'yearly'). */
+export const recurrenceOf = (s) => s.recurrence ?? (s.yearly ? 'yearly' : 'none');
+
+/** Data no mês/ano pedido, com o dia "colado" ao fim do mês (31 → 30, 29 fev → 28). */
+function clampDay(year, month, day) {
+  const last = new Date(year, month + 1, 0).getDate();
+  return toISO(new Date(year, month, Math.min(day, last)));
 }
+
+/**
+ * Próxima ocorrência (>= from) de uma data especial e quanto tempo passou desde o início.
+ * Devolve { date, days, count, unit } — ex.: count 14, unit 'meses' num "mêsversário".
+ */
+export function nextOccurrence(special, from = today()) {
+  const rec = recurrenceOf(special);
+  const start = special.date;
+  if (rec === 'none' || start >= from) {
+    return { date: start, days: daysBetween(from, start), count: null, unit: null, years: null };
+  }
+  const [y, m, d] = start.split('-').map(Number);
+  let next, count, unit;
+  if (rec === 'daily') {
+    next = from; count = daysBetween(start, next); unit = count === 1 ? 'dia' : 'dias';
+  } else if (rec === 'weekly') {
+    const weeks = Math.ceil(daysBetween(start, from) / 7);
+    next = addDays(start, weeks * 7); count = weeks; unit = weeks === 1 ? 'semana' : 'semanas';
+  } else if (rec === 'monthly') {
+    const f = parse(from);
+    let months = (f.getFullYear() - y) * 12 + (f.getMonth() - (m - 1));
+    next = clampDay(y, m - 1 + months, d);
+    if (next < from) { months += 1; next = clampDay(y, m - 1 + months, d); }
+    count = months; unit = months === 1 ? 'mês' : 'meses';
+  } else { // yearly
+    const fy = parse(from).getFullYear();
+    next = clampDay(fy, m - 1, d);
+    if (next < from) next = clampDay(fy + 1, m - 1, d);
+    count = parse(next).getFullYear() - y; unit = count === 1 ? 'ano' : 'anos';
+  }
+  return {
+    date: next, days: daysBetween(from, next),
+    count: count > 0 ? count : null, unit,
+    years: rec === 'yearly' && count > 0 ? count : null,
+  };
+}
+
+/** A data especial calha neste dia? */
+export const occursOn = (special, iso) => nextOccurrence(special, iso).date === iso;
 
 /** Próxima data de uma tarefa recorrente. */
 export function nextDue(task) {

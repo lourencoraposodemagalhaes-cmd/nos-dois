@@ -49,6 +49,8 @@ await db.exec(`
 // ---------- migração (2x para confirmar que pode repetir-se) ----------
 await db.exec(SQL('multi.sql'));
 await db.exec(SQL('multi.sql'));
+await db.exec(SQL('grupos-repeticoes.sql'));
+await db.exec(SQL('grupos-repeticoes.sql'));
 console.log('Migração aplicada (2x) sem erros');
 
 // ---------- utilitários ----------

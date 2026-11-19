@@ -293,6 +293,8 @@ function demoSeed() {
     tasks: [
       r({ title: 'Pôr o lixo na rua', person: a, due_date: d(0), recurrence: 'weekly', done: false }),
       r({ title: 'Marcar revisão do carro', person: null, due_date: d(4), recurrence: 'none', done: false }),
+      r({ title: 'Pagar senhor das mudanças', person: b, due_date: d(2), recurrence: 'none', done: false, group_name: 'Obras' }),
+      r({ title: 'Escolher azulejos', person: null, due_date: d(6), recurrence: 'none', done: false, group_name: 'Obras' }),
       r({ title: 'Regar as plantas', person: b, due_date: d(1), recurrence: 'weekly', done: false }),
     ],
     shopping_items: [
@@ -303,6 +305,7 @@ function demoSeed() {
     ],
     special_dates: [
       r({ title: 'O nosso aniversário', date: '2019-' + d(12).slice(5), kind: 'anniversary', yearly: true }),
+      r({ title: 'Mêsversário do Jaime', date: '2025-08-' + d(3).slice(8), kind: 'birthday', recurrence: 'monthly' }),
       r({ title: 'Aniversário da Beatriz', date: '1995-' + d(40).slice(5), kind: 'birthday', yearly: true }),
     ],
     daily_moments: [{ id: 'moment', date: d(0), at: new Date(Date.now() - 36e5).toISOString() }],

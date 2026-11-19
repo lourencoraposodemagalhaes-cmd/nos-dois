@@ -5,6 +5,16 @@ import { Icon, PageHeader, PersonPicker, Sheet, Field, Fab, Empty, usePeople, pe
 
 const RECUR = { none: 'Não repete', daily: 'Todos os dias', weekly: 'Todas as semanas', monthly: 'Todos os meses' };
 
+/** Grupos já usados (ex: "Obras", "Casamento"), por ordem alfabética. */
+export function taskGroups(tasks) {
+  const seen = new Map();
+  for (const t of tasks) {
+    const g = t.group_name?.trim();
+    if (g && !seen.has(g.toLowerCase())) seen.set(g.toLowerCase(), g);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, 'pt'));
+}
+
 export const sortTasks = (a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || a.created_at.localeCompare(b.created_at);
 
 /** Concluir: tarefas recorrentes passam para a próxima data em vez de ficarem feitas. */
@@ -32,6 +42,12 @@ export function Tarefas() {
     return t.person === who || (!t.person && !t.kid_id);
   };
   const open = tasks.filter((t) => !t.done && match(t)).sort(sortTasks);
+  // Tarefas sem grupo primeiro; depois um bloco por grupo.
+  const groups = taskGroups(open);
+  const sections = [
+    { title: groups.length ? 'Sem grupo' : null, tasks: open.filter((t) => !t.group_name?.trim()) },
+    ...groups.map((g) => ({ title: `🏷️ ${g}`, tasks: open.filter((t) => t.group_name?.trim().toLowerCase() === g.toLowerCase()) })),
+  ].filter((s) => s.tasks.length);
   const done = tasks.filter((t) => t.done && match(t)).sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? ''));
 
   return (
@@ -45,7 +61,12 @@ export function Tarefas() {
       </div>
 
       {open.length === 0 && <Empty icon="check" title="Tudo feito!" text="Nada por fazer. Aproveitem 🎉" />}
-      <div class="list">{open.map((t) => <TaskRow task={t} onOpen={() => setEditing(t)} />)}</div>
+      {sections.map((s) => (
+        <div class="group">
+          {s.title && <h3 class="section-title">{s.title} <span class="count">{s.tasks.length}</span></h3>}
+          <div class="list">{s.tasks.map((t) => <TaskRow task={t} hideGroup onOpen={() => setEditing(t)} />)}</div>
+        </div>
+      ))}
 
       {done.length > 0 && (
         <>
@@ -64,12 +85,12 @@ export function Tarefas() {
       )}
 
       <Fab label="Nova tarefa" onClick={() => setEditing({})} />
-      {editing && <TaskSheet task={editing} onClose={() => setEditing(null)} />}
+      {editing && <TaskSheet task={editing} groups={taskGroups(tasks)} onClose={() => setEditing(null)} />}
     </section>
   );
 }
 
-export function TaskRow({ task, onOpen }) {
+export function TaskRow({ task, onOpen, hideGroup }) {
   const people = usePeople();
   const late = !task.done && task.due_date && task.due_date < today();
   const color = itemColor(task, people);
@@ -83,6 +104,7 @@ export function TaskRow({ task, onOpen }) {
         <strong>{task.title}</strong>
         <small>
           {personLabel(task.person, people, task.kid_id)}
+          {!hideGroup && task.group_name && <> · 🏷️ {task.group_name}</>}
           {task.due_date && <> · <span class={late ? 'late' : ''}>{friendly(task.due_date)}</span></>}
           {task.recurrence !== 'none' && <> · <span class="inline-ico"><Icon name="repeat" size={12} /></span></>}
         </small>
@@ -91,9 +113,9 @@ export function TaskRow({ task, onOpen }) {
   );
 }
 
-function TaskSheet({ task, onClose }) {
+function TaskSheet({ task, groups = [], onClose }) {
   const isNew = !task.id;
-  const [f, setF] = useState({ title: '', person: null, due_date: '', recurrence: 'none', ...task });
+  const [f, setF] = useState({ title: '', person: null, due_date: '', recurrence: 'none', group_name: '', ...task });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const save = (e) => {
@@ -104,6 +126,9 @@ function TaskSheet({ task, onClose }) {
       due_date: f.due_date || (f.recurrence !== 'none' ? today() : null),
     };
     if (f.kid_id || task.kid_id) row.kid_id = f.kid_id ?? null;
+    // Reaproveita a grafia de um grupo que já existe ("obras" → "Obras").
+    const g = f.group_name?.trim();
+    if (g || task.group_name) row.group_name = g ? (groups.find((x) => x.toLowerCase() === g.toLowerCase()) ?? g) : null;
     isNew ? insert('tasks', { ...row, done: false }) : update('tasks', task.id, row);
     onClose();
   };
@@ -114,6 +139,17 @@ function TaskSheet({ task, onClose }) {
       <form onSubmit={save} class="form">
         <input class="big-input" placeholder="O que há para fazer?" value={f.title} onInput={set('title')} autofocus={isNew} />
         <Field label="Quem"><PersonPicker value={f.person} kid={f.kid_id} onChange={(person, kid_id) => setF({ ...f, person, kid_id })} /></Field>
+        <Field label="Grupo (opcional)">
+          <input placeholder="ex: Obras, Casamento, Bebé" value={f.group_name ?? ''} onInput={set('group_name')} maxLength={30} />
+          {groups.length > 0 && (
+            <div class="chips">
+              {groups.map((g) => (
+                <button type="button" class={`chip ${f.group_name?.trim().toLowerCase() === g.toLowerCase() ? 'on' : ''}`}
+                  onClick={() => setF({ ...f, group_name: f.group_name?.trim().toLowerCase() === g.toLowerCase() ? '' : g })}>🏷️ {g}</button>
+              ))}
+            </div>
+          )}
+        </Field>
         <Field label="Até quando"><input type="date" value={f.due_date ?? ''} onInput={set('due_date')} /></Field>
         <Field label="Repetir">
           <select value={f.recurrence} onChange={set('recurrence')}>

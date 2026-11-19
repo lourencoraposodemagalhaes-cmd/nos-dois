@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { useTable, insert, update, remove } from '../lib/store.js';
-import { today, monthGrid, monthName, WEEK_SHORT, longDate, time, parse, nextOccurrence, eventDays, eventEnd, isMultiDay, rangeLabel } from '../lib/dates.js';
+import { today, monthGrid, monthName, WEEK_SHORT, longDate, time, parse, nextOccurrence, occursOn, eventDays, eventEnd, isMultiDay, rangeLabel } from '../lib/dates.js';
+import { ageLabel } from './Datas.jsx';
 import { Icon, PageHeader, PersonDot, PersonPicker, Sheet, Field, Fab, Empty, usePeople, personLabel, itemColor } from '../ui.jsx';
 
 // Eventos de vários dias primeiro, depois por hora.
@@ -8,7 +9,7 @@ export const sortEvents = (a, b) => (isMultiDay(b) - isMultiDay(a)) || (a.start_
 
 /** Datas especiais que caem num certo dia (para mostrar no calendário). */
 export function specialsOn(specials, iso) {
-  return specials.filter((s) => (s.yearly ? s.date.slice(5) === iso.slice(5) && s.date <= iso : s.date === iso));
+  return specials.filter((s) => occursOn(s, iso));
 }
 
 export function Calendario() {
@@ -65,7 +66,7 @@ export function Calendario() {
         return (
           <div class="card item special-row">
             <span class="special-ico"><Icon name="heart" size={18} /></span>
-            <div class="grow"><strong>{s.title}</strong>{o.years && <small>{o.years} anos</small>}</div>
+            <div class="grow"><strong>{s.title}</strong>{o.count && <small>{ageLabel(s, o)}</small>}</div>
           </div>
         );
       })}

@@ -34,12 +34,24 @@ const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', '
 const hhmm = (t) => (t ? t.slice(0, 5) : '');
 
 function nextOccurrence(s, from) {
-  if (!s.yearly) return { date: s.date, days: daysBetween(from, s.date) };
+  const rec = s.recurrence || (s.yearly ? 'yearly' : 'none');
+  if (rec === 'none' || s.date >= from) return { date: s.date, days: daysBetween(from, s.date) };
   const [y, m, d] = s.date.split('-').map(Number);
-  const at = (year) => iso(new Date(year, m - 1, Math.min(d, new Date(year, m, 0).getDate())));
-  let next = at(parse(from).getFullYear());
-  if (next < from) next = at(parse(from).getFullYear() + 1);
-  return { date: next, days: daysBetween(from, next), years: parse(next).getFullYear() - y };
+  const clamp = (yy, mm) => iso(new Date(yy, mm, Math.min(d, new Date(yy, mm + 1, 0).getDate())));
+  let next;
+  if (rec === 'daily') next = from;
+  else if (rec === 'weekly') next = addDays(s.date, Math.ceil(daysBetween(s.date, from) / 7) * 7);
+  else if (rec === 'monthly') {
+    const f = parse(from);
+    let months = (f.getFullYear() - y) * 12 + (f.getMonth() - (m - 1));
+    next = clamp(y, m - 1 + months);
+    if (next < from) next = clamp(y, m + months);
+  } else {
+    const fy = parse(from).getFullYear();
+    next = clamp(fy, m - 1);
+    if (next < from) next = clamp(fy + 1, m - 1);
+  }
+  return { date: next, days: daysBetween(from, next) };
 }
 
 // ---------- sessão ----------

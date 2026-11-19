@@ -64,19 +64,40 @@ function friendly(date: string, today: string) {
   return `${WEEKDAYS[d.getUTCDay()]}, ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
-function nextOccurrence(s: Row, from: string) {
-  if (!s.yearly) return { date: s.date, days: daysBetween(from, s.date), years: null as number | null };
-  const [y, m, d] = s.date.split('-').map(Number);
-  const fy = Number(from.slice(0, 4));
-  const at = (year: number) => {
-    const last = new Date(Date.UTC(year, m, 0)).getUTCDate();
-    return iso(new Date(Date.UTC(year, m - 1, Math.min(d, last))));
-  };
-  let next = at(fy);
-  if (next < from) next = at(fy + 1);
-  const years = Number(next.slice(0, 4)) - y;
-  return { date: next, days: daysBetween(from, next), years: years > 0 ? years : null };
+// Mesma lógica da app (src/lib/dates.js): none | daily | weekly | monthly | yearly.
+const recurrenceOf = (s: Row) => s.recurrence ?? (s.yearly ? 'yearly' : 'none');
+function clampDay(year: number, month: number, day: number) {
+  const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return iso(new Date(Date.UTC(year, month, Math.min(day, last))));
 }
+
+function nextOccurrence(s: Row, from: string) {
+  const rec = recurrenceOf(s);
+  const start = s.date as string;
+  if (rec === 'none' || start >= from) return { date: start, days: daysBetween(from, start), count: null as number | null, unit: '' };
+  const [y, m, d] = start.split('-').map(Number);
+  let next: string, count: number, unit: string;
+  if (rec === 'daily') { next = from; count = daysBetween(start, next); unit = count === 1 ? 'dia' : 'dias'; }
+  else if (rec === 'weekly') {
+    const weeks = Math.ceil(daysBetween(start, from) / 7);
+    next = addDays(start, weeks * 7); count = weeks; unit = weeks === 1 ? 'semana' : 'semanas';
+  } else if (rec === 'monthly') {
+    const f = parse(from);
+    let months = (f.getUTCFullYear() - y) * 12 + (f.getUTCMonth() - (m - 1));
+    next = clampDay(y, m - 1 + months, d);
+    if (next < from) { months += 1; next = clampDay(y, m - 1 + months, d); }
+    count = months; unit = months === 1 ? 'mês' : 'meses';
+  } else {
+    const fy = parse(from).getUTCFullYear();
+    next = clampDay(fy, m - 1, d);
+    if (next < from) next = clampDay(fy + 1, m - 1, d);
+    count = parse(next).getUTCFullYear() - y; unit = count === 1 ? 'ano' : 'anos';
+  }
+  return { date: next, days: daysBetween(from, next), count: count > 0 ? count : null, unit };
+}
+
+// Quando avisar (dias antes): datas raras com mais antecedência, frequentes só no próprio dia.
+const REMIND_DAYS: Record<string, number[]> = { none: [0, 1, 7], yearly: [0, 1, 7], monthly: [0, 1], weekly: [0], daily: [0] };
 
 /** Para quem é: uma pessoa, ou os dois quando person é null. */
 const forUser = (person: string | null, userId: string) => !person || person === userId;
@@ -192,9 +213,9 @@ async function tickHouse(house: string, people: Row[], now: { minutes: number },
 
   for (const s of specials ?? []) {
     const o = nextOccurrence(s, today);
-    if (![0, 1, 7].includes(o.days)) continue;
+    if (!(REMIND_DAYS[recurrenceOf(s)] ?? [0]).includes(o.days)) continue;
     if (!(await once(`special:${s.id}:${o.date}:${o.days}`))) continue;
-    const extra = o.years ? ` (${o.years} ${s.kind === 'anniversary' ? 'anos juntos' : 'anos'})` : '';
+    const extra = o.count ? ` (${o.count} ${o.unit}${s.kind === 'anniversary' ? ' juntos' : ''})` : '';
     const note = o.days === 0
       ? { title: `🎉 Hoje: ${s.title}`, body: `É hoje!${extra}${s.notes ? ` · ${s.notes}` : ''}` }
       : o.days === 1

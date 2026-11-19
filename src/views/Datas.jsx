@@ -1,14 +1,28 @@
 import { useState } from 'preact/hooks';
 import { useTable, insert, update, remove } from '../lib/store.js';
-import { nextOccurrence, shortDate, friendly, today } from '../lib/dates.js';
+import { nextOccurrence, recurrenceOf, shortDate, friendly, today } from '../lib/dates.js';
 import { Icon, PageHeader, Sheet, Field, Fab, Empty } from '../ui.jsx';
 import { NosSwitch } from './Jarro.jsx';
 
 export const KINDS = {
-  anniversary: { label: 'Aniversário de casal', icon: 'rings', noun: 'anos juntos' },
-  birthday: { label: 'Aniversário', icon: 'cake', noun: 'anos' },
-  other: { label: 'Outra data', icon: 'star', noun: 'anos' },
+  anniversary: { label: 'Aniversário de casal', icon: 'rings', together: true },
+  birthday: { label: 'Aniversário', icon: 'cake' },
+  other: { label: 'Outra data', icon: 'star' },
 };
+
+export const RECURRENCES = {
+  none: 'Não repete',
+  daily: 'Todos os dias',
+  weekly: 'Todas as semanas',
+  monthly: 'Todos os meses',
+  yearly: 'Todos os anos',
+};
+
+/** "7 anos juntos", "14 meses juntos", "100 dias"… */
+export function ageLabel(s, o = s.next) {
+  if (!o?.count) return '';
+  return `${o.count} ${o.unit}${KINDS[s.kind]?.together ? ' juntos' : ''}`;
+}
 
 /** Datas especiais ordenadas pela próxima ocorrência. */
 export function upcomingSpecials(specials) {
@@ -28,7 +42,7 @@ export function Datas() {
   const specials = useTable('special_dates');
   const [editing, setEditing] = useState(null);
   const list = upcomingSpecials(specials);
-  const past = specials.filter((s) => !s.yearly && s.date < today());
+  const past = specials.filter((s) => recurrenceOf(s) === 'none' && s.date < today());
 
   return (
     <section>
@@ -57,7 +71,7 @@ function Hero({ s, onClick }) {
       <span class="hero-days">{s.next.days === 0 ? '🎉' : s.next.days}</span>
       <span class="hero-unit">{s.next.days === 0 ? 'É hoje!' : s.next.days === 1 ? 'dia' : 'dias'}</span>
       <strong>{s.title}</strong>
-      <small>{friendly(s.next.date)}{s.next.years ? ` · ${s.next.years} ${k.noun}` : ''}</small>
+      <small>{friendly(s.next.date)}{s.next.count ? ` · ${ageLabel(s)}` : ''}</small>
     </button>
   );
 }
@@ -69,7 +83,7 @@ export function SpecialRow({ s, onClick }) {
       <span class="special-ico"><Icon name={k.icon} size={18} /></span>
       <div class="grow">
         <strong>{s.title}</strong>
-        <small>{shortDate(s.next.date)}{s.next.years ? ` · ${s.next.years} ${k.noun}` : ''}</small>
+        <small>{shortDate(s.next.date)}{s.next.count ? ` · ${ageLabel(s)}` : ''}</small>
       </div>
       <span class="badge">{s.next.days < 0 ? 'passou' : s.next.days === 0 ? 'hoje' : `${s.next.days}d`}</span>
     </button>
@@ -78,11 +92,12 @@ export function SpecialRow({ s, onClick }) {
 
 function SpecialSheet({ s, onClose }) {
   const isNew = !s.id;
-  const [f, setF] = useState({ title: '', date: '', kind: 'anniversary', yearly: true, notes: '', ...s });
+  const [f, setF] = useState({ title: '', date: '', kind: 'anniversary', notes: '', ...s, recurrence: recurrenceOf({ yearly: true, ...s }) });
   const save = (e) => {
     e.preventDefault();
     if (!f.title.trim() || !f.date) return;
-    const row = { title: f.title.trim(), date: f.date, kind: f.kind, yearly: f.yearly, notes: f.notes?.trim() || null };
+    // 'yearly' mantém-se em sincronia para versões antigas (widget).
+    const row = { title: f.title.trim(), date: f.date, kind: f.kind, recurrence: f.recurrence, yearly: f.recurrence === 'yearly', notes: f.notes?.trim() || null };
     isNew ? insert('special_dates', row) : update('special_dates', s.id, row);
     onClose();
   };
@@ -101,13 +116,14 @@ function SpecialSheet({ s, onClose }) {
             ))}
           </div>
         </Field>
-        <Field label={f.yearly ? 'Data original (ex: ano em que começou)' : 'Data'}>
+        <Field label={f.recurrence !== 'none' ? 'Data em que começou' : 'Data'}>
           <input type="date" required value={f.date} onInput={(e) => setF({ ...f, date: e.target.value })} />
         </Field>
-        <label class="switch-row">
-          <span>Repete todos os anos</span>
-          <input type="checkbox" class="switch" checked={f.yearly} onChange={(e) => setF({ ...f, yearly: e.target.checked })} />
-        </label>
+        <Field label="Repetir">
+          <select value={f.recurrence} onChange={(e) => setF({ ...f, recurrence: e.target.value })}>
+            {Object.entries(RECURRENCES).map(([k, l]) => <option value={k}>{l}</option>)}
+          </select>
+        </Field>
         <Field label="Notas"><textarea rows="2" placeholder="Ideias de prenda, restaurante…" value={f.notes ?? ''}
           onInput={(e) => setF({ ...f, notes: e.target.value })} /></Field>
         <button class="btn primary" type="submit">{isNew ? 'Adicionar' : 'Guardar'}</button>
